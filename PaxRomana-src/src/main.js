@@ -1,6 +1,6 @@
 // PAX ROMANA — a one-level sniper mission. Entry point and game loop.
 import * as THREE from 'three';
-import { U, WIND, SPAWN } from './config.js';
+import { U, WIND, SPAWN, CAMP } from './config.js';
 import { makeTextures } from './textures.js';
 import { buildTerrain, groundAt } from './terrain.js';
 import { buildSky } from './sky.js';
@@ -185,7 +185,11 @@ async function boot() {
 
   // ---- loop ----
   const clock = new THREE.Clock();
-  const shadowC = new THREE.Vector3(), aimP = new THREE.Vector3();
+  const shadowC = new THREE.Vector3();
+  const SHADOW_ANCHORS = [
+    { c: new THREE.Vector3(0, 48, 0), ext: 72, reach: 75 },                 // the whole château, keep to tower bases
+    { c: new THREE.Vector3(CAMP.x, CAMP.h + 4, CAMP.z), ext: 76, reach: 80 }, // camp, palisade and the drill ring
+  ];
   let gameTime = 0;
 
   function frame() {
@@ -245,10 +249,17 @@ async function boot() {
     rangeT -= dtReal;
     if (scoped && rangeT <= 0) { rangeT = 0.12; range = measure(); }
     if (kc.active) sky.setShadow(shadowC.copy(kc.hit.point).divideScalar(20).round().multiplyScalar(20), 60);
-    else if (scoped && weapon.zoom >= 6 && range > 60) {
+    else if (scoped && weapon.zoom >= 6) {
+      // Through the scope, sharpen the sun shadows on whichever landmark the barrel points at. The box is fixed per
+      // landmark (not centred on the aim point), so it cannot jump as the reticle sways across walls, gaps and sky.
       camera.getWorldDirection(v1);
-      aimP.copy(camera.position).addScaledVector(v1, range).divideScalar(24).round().multiplyScalar(24);
-      sky.setShadow(aimP, weapon.zoom >= 12 ? 55 : 85);
+      let pick = null, bestD = 1e9;
+      for (const a of SHADOW_ANCHORS) {
+        const t = v2.subVectors(a.c, camera.position).dot(v1);
+        const d = t > 0 ? v2.addScaledVector(v1, -t).length() : v2.length();
+        if (d < a.reach && d < bestD) { bestD = d; pick = a; }
+      }
+      if (pick) sky.setShadow(pick.c, pick.ext); else sky.setShadow(shadowC.set(60, 25, 10), 200);
     } else sky.setShadow(shadowC.set(60, 25, 10), 200);
 
     // HUD
