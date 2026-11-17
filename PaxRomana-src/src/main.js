@@ -50,7 +50,7 @@ async function boot() {
   const fx = new FX(scene);
   castle.smoke.forEach((p, i) => fx.addSmoke(p, i < 2 ? 1 : 1.5));
   const audio = new Audio();
-  const player = new Player(camera, canvas, veg.obstacles, audio);
+  const player = new Player(camera, canvas, [...castle.solids, ...veg.obstacles], audio, legion.soldiers);
   const world = { colliders: castle.colliders, legion, fx, audio, onKill: null, onMiss: null };
   const weapon = new Weapon(scene, camera, player, world, tex);
   const post = buildPost(renderer, scene, camera);
@@ -116,6 +116,7 @@ async function boot() {
   // ---- input (every mouse action has a keyboard twin) ----
   function trigger() {
     if (kc.active) { if (kc.t > 0.4) endKillCam(); return; }
+    if (player.swimming) { hud.hint('You cannot shoot while swimming', 1800); return; }
     tryFire();
   }
   canvas.addEventListener('mousedown', (e) => {
@@ -136,6 +137,31 @@ async function boot() {
     if (code === 'Minus' || code === 'NumpadSubtract') weapon.cycleZoom(-1);
     if (code === 'KeyH') hud.toggleKeys();
   };
+  let edgeT = 0;
+  player.onEdge = () => { if (edgeT <= 0) { edgeT = 6; hud.hint('Edge of the valley — the mission lies behind you', 3000); } };
+
+  // Sentries notice a rifleman who walks up to them: closer if you crouch or crawl, and only with a clear line past the masonry.
+  let spotT = 0, spotted = false;
+  function watch() {
+    const R = [45, 28, 13][player.stance] * (player.swimming ? 0.5 : 1);
+    let seen = false;
+    v2.copy(camera.position);
+    for (const s of legion.soldiers) {
+      if (!s.alive) continue;
+      v1.copy(s.pos); v1.y += 1.67;
+      const d = v1.distanceTo(v2);
+      if (d > R) continue;
+      v3.subVectors(v2, v1).normalize();
+      ray.set(v1, v3); ray.far = d - 0.3;
+      if (ray.intersectObjects(world.colliders, false).length === 0) { seen = true; break; }
+    }
+    if (seen) {
+      legion.alertAround(player.pos, R + 25, 12, 14);
+      if (!spotted) hud.feed('<b>SPOTTED</b> — a sentry has seen you', 'warn');
+    }
+    spotted = seen;
+  }
+
   player.onLock = (locked) => {
     if (state.over) return;
     player.enabled = locked;
@@ -202,6 +228,10 @@ async function boot() {
 
     if (!paused) {
       if (!kc.active) player.update(dtReal);
+      if (player.swimming) weapon.wantAds = false;
+      veg.update(player.pos.x, player.pos.z);
+      edgeT -= dtReal; spotT -= dt;
+      if (spotT <= 0 && state.started && !state.over && !kc.active) { spotT = 0.5; watch(); }
       weapon.update(dtReal, dt, !kc.active && state.started);
       legion.update(dt, gameTime);
       if (state.started && !state.over) state.time += dt;

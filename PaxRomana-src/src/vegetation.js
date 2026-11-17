@@ -1,4 +1,4 @@
-// Instanced grass meadow around the sniper's ridge, three tree species, boulders.
+// Instanced grass meadow that follows the player, three tree species, boulders.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { groundAt, macroAt, heightAt } from './terrain.js';
@@ -25,8 +25,9 @@ function grassGeometry() {
   return g;
 }
 
+const GC = 24, GN = 7;      // grass cell size (m) and cells per side of the window around the player
+
 function buildGrass(count) {
-  const rng = mulberry32(99);
   const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8, side: THREE.DoubleSide });
   mat.onBeforeCompile = (s) => {
     s.uniforms.uTime = U.uTime;
@@ -47,27 +48,68 @@ function buildGrass(count) {
       .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb *= mix(0.42, 1.35, vGh);');
     FIX_NORMAL(s);
   };
-  const mesh = new THREE.InstancedMesh(grassGeometry(), mat, count);
+  // The meadow is a 7 x 7 window of cells that follows the player. Each slot is addressed toroidally, so walking
+  // into a new row only refills the cells that scrolled out; a cell always regrows the same blades (seeded by its coords).
+  const cap = Math.max(200, Math.round(count / 25)), geo = grassGeometry(), group = new THREE.Group();
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), sc = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
   const col = new THREE.Color(), base = new THREE.Color().setRGB(0.3, 0.41, 0.15, THREE.SRGBColorSpace);
-  for (let i = 0; i < count; i++) {
-    const a = rng() * 6.283, r = 92 * Math.pow(rng(), 0.72);
-    const x = SPAWN.x + Math.cos(a) * r, z = SPAWN.z + Math.sin(a) * r;
-    const patch = fbm(x * 0.09, z * 0.09, 2, 77);
-    p.set(x, groundAt(x, z) - 0.03, z);
-    q.setFromAxisAngle(up, rng() * 6.283);
-    const h = (0.32 + rng() * 0.38) * (0.6 + patch * 1.3);
-    sc.set(1 + rng() * 0.8, h, 1 + rng() * 0.8);
-    m.compose(p, q, sc);
-    mesh.setMatrixAt(i, m);
-    const t = smoothstep(0.3, 0.7, macroAt(x, z)), k = 0.8 + rng() * 0.45;
-    col.setRGB(base.r * lerp(1.22, 0.74, t) * k, base.g * lerp(1.04, 1.0, t) * k, base.b * lerp(0.66, 0.78, t) * k);
-    if (rng() < 0.05) col.setRGB(0.42 * k, 0.36 * k, 0.12 * k);     // dry straw
-    mesh.setColorAt(i, col);
+  const cells = [];
+  for (let i = 0; i < GN * GN; i++) {
+    const mesh = new THREE.InstancedMesh(geo, mat, cap);
+    mesh.setColorAt(0, col);
+    mesh.receiveShadow = true; mesh.visible = false;
+    mesh.boundingSphere = new THREE.Sphere();
+    group.add(mesh);
+    cells.push({ mesh, cx: NaN, cz: NaN, n: 0 });
   }
-  mesh.instanceMatrix.needsUpdate = true;
-  mesh.receiveShadow = true;
-  return mesh;
+  const mod = (a) => ((a % GN) + GN) % GN;
+  function fill(cell, cx, cz) {
+    const rng = mulberry32(((cx * 73856093) ^ (cz * 19349663)) >>> 0), mesh = cell.mesh;
+    let n = 0, lo = 1e9, hi = -1e9;
+    for (let i = 0; i < cap; i++) {
+      const x = (cx + rng()) * GC, z = (cz + rng()) * GC, r1 = rng(), r2 = rng(), r3 = rng(), r4 = rng(), r5 = rng(), r6 = rng();
+      const h = groundAt(x, z);
+      if (h < 1.0) continue;                                                       // river bed and shore
+      if (Math.abs(x) < 64 && Math.abs(z) < 64 && Math.hypot(x, z) < 60) continue;  // castle rock
+      if (Math.hypot(x - CAMP.x, z - CAMP.z) < CAMP.r + 5) continue;                // trampled camp
+      if (Math.hypot((groundAt(x + 0.8, z) - h) / 0.8, (groundAt(x, z + 0.8) - h) / 0.8) > 0.6) continue;   // bare rock
+      if (x > -10 && x < 185 && z > 30 && z < 310 && (distToPath(x, z, ROAD) < 3 || distToPath(x, z, ROAD2) < 3)) continue;
+      const patch = fbm(x * 0.09, z * 0.09, 2, 77);
+      p.set(x, h - 0.03, z);
+      q.setFromAxisAngle(up, r1 * 6.283);
+      sc.set(1 + r2 * 0.8, (0.32 + r3 * 0.38) * (0.6 + patch * 1.3), 1 + r4 * 0.8);
+      m.compose(p, q, sc);
+      mesh.setMatrixAt(n, m);
+      const t = smoothstep(0.3, 0.7, macroAt(x, z)), k = 0.8 + r5 * 0.45;
+      col.setRGB(base.r * lerp(1.22, 0.74, t) * k, base.g * lerp(1.04, 1.0, t) * k, base.b * lerp(0.66, 0.78, t) * k);
+      if (r6 < 0.05) col.setRGB(0.42 * k, 0.36 * k, 0.12 * k);     // dry straw
+      mesh.setColorAt(n, col);
+      n++; lo = Math.min(lo, h); hi = Math.max(hi, h);
+    }
+    mesh.instanceMatrix.needsUpdate = true; mesh.instanceColor.needsUpdate = true;
+    mesh.boundingSphere.center.set((cx + 0.5) * GC, n ? (lo + hi) / 2 : 0, (cz + 0.5) * GC);
+    mesh.boundingSphere.radius = Math.hypot(GC * 0.75, n ? (hi - lo) / 2 + 1.5 : 0);
+    cell.cx = cx; cell.cz = cz; cell.n = n;
+  }
+  const stale = [];
+  // Re-centre the meadow on (px, pz); refills at most `budget` cells per call, nearest first.
+  function update(px, pz, budget = 1) {
+    const pcx = Math.floor(px / GC), pcz = Math.floor(pz / GC), H = (GN - 1) / 2;
+    stale.length = 0;
+    for (let dz = -H; dz <= H; dz++) for (let dx = -H; dx <= H; dx++) {
+      const cx = pcx + dx, cz = pcz + dz, cell = cells[mod(cz) * GN + mod(cx)];
+      const d = Math.hypot((cx + 0.5) * GC - px, (cz + 0.5) * GC - pz);
+      if (cell.cx !== cx || cell.cz !== cz) { cell.mesh.visible = false; stale.push({ cell, cx, cz, d }); continue; }
+      cell.mesh.count = Math.floor(cell.n * (1 - 0.72 * smoothstep(28, 80, d)));     // thin out with distance
+      cell.mesh.visible = cell.mesh.count > 0;
+    }
+    if (!stale.length) return;
+    stale.sort((a, b) => a.d - b.d);
+    for (let i = 0; i < stale.length && i < budget; i++) fill(stale[i].cell, stale[i].cx, stale[i].cz);
+  }
+  update(SPAWN.x, SPAWN.z, Infinity);
+  update(SPAWN.x, SPAWN.z, 0);
+  return { group, update };
 }
 
 // ---- trees ----
@@ -143,7 +185,8 @@ function distToPath(x, z, path) {
 export function buildVegetation(tex, { grassCount = 130000 } = {}) {
   const group = new THREE.Group();
   const rng = mulberry32(2024);
-  group.add(buildGrass(grassCount));
+  const grass = buildGrass(grassCount);
+  group.add(grass.group);
 
   const barkMat = new THREE.MeshStandardMaterial({ map: tex.bark.map, normalMap: tex.bark.normalMap, roughness: 0.95 });
   const leafMat = (map, color) => {
@@ -174,7 +217,7 @@ export function buildVegetation(tex, { grassCount = 130000 } = {}) {
     q.setFromAxisAngle(up, rng() * 6.283);
     m4.compose(new THREE.Vector3(x, y, z), q, new THREE.Vector3(s, s * (0.9 + rng() * 0.25), s));
     defs[kind].list.push(m4.clone());
-    if (Math.hypot(x - SPAWN.x, z - SPAWN.z) < 70) obstacles.push({ x, z, r: 0.55 * s });
+    if (inner) obstacles.push({ x, z, r: (kind === 'cypress' ? 0.3 : 0.5) * s });
   };
   const ok = (x, z) => {
     const h = groundAt(x, z);
@@ -245,8 +288,9 @@ export function buildVegetation(tex, { grassCount = 130000 } = {}) {
     q.setFromEuler(new THREE.Euler(rng() * 0.6, rng() * 6.283, rng() * 0.6));
     m4.compose(new THREE.Vector3(x, groundAt(x, z) - s * 0.15, z), q, new THREE.Vector3(s, s * (0.6 + rng() * 0.6), s * (0.7 + rng() * 0.6)));
     rocks.setMatrixAt(i, m4);
+    if (s >= 0.8) obstacles.push({ x, z, r: s * 0.8 });
   }
   rocks.castShadow = rocks.receiveShadow = true;
   group.add(rocks);
-  return { group, obstacles };
+  return { group, obstacles, update: grass.update };
 }

@@ -1,16 +1,28 @@
-// First-person controller: pointer-lock look, walk / crouch / prone on the ridge, scope sway and breath control.
+// First-person controller: pointer-lock look, free roam on foot (walk / crouch / prone, wade and swim, cross the bridge),
+// scope sway and breath control.
 import * as THREE from 'three';
 import { groundAt } from './terrain.js';
-import { SPAWN } from './config.js';
+import { SPAWN, INNER, BRIDGE } from './config.js';
+import { resolve } from './collision.js';
 
 const EYE = [1.7, 1.08, 0.42];
 const SWAY = [0.0021, 0.0011, 0.00042];
 export const BASE_FOV = 68;
+const RADIUS = 0.4;                    // player body radius
+const SWIM_Y = -1.35;                  // feet height when afloat (water surface is y = 0)
+const EDGE = 14, X0 = INNER.x0 + EDGE, X1 = INNER.x0 + INNER.size - EDGE, Z0 = INNER.z0 + EDGE, Z1 = INNER.z0 + INNER.size - EDGE;
+const DECK = 2.7;                      // bridge half-width
+const PIERS = [0, 1, 2, 3, 4].map((i) => {
+  const z = BRIDGE.z0 + 8 + i * (BRIDGE.z1 - BRIDGE.z0 - 16) / 4;
+  return { x0: BRIDGE.x - 4.8, x1: BRIDGE.x + 4.8, z0: z - 1.3, z1: z + 1.3 };
+});
 
 export class Player {
-  constructor(camera, dom, obstacles, audio) {
-    this.camera = camera; this.dom = dom; this.obstacles = obstacles; this.audio = audio;
-    this.pos = new THREE.Vector3(SPAWN.x, 0, SPAWN.z);
+  // solids: static footprints (see collision.js); soldiers: the garrison, whose living members also block the way
+  constructor(camera, dom, solids, audio, soldiers = []) {
+    this.camera = camera; this.dom = dom; this.solids = solids; this.audio = audio; this.soldiers = soldiers;
+    this.pos = new THREE.Vector3(SPAWN.x, groundAt(SPAWN.x, SPAWN.z), SPAWN.z);
+    this.onBridge = false; this.swimming = false; this.depth = 0; this.onEdge = null;
     this.yaw = Math.atan2(SPAWN.x, SPAWN.z); this.pitch = -0.1;
     this.stance = 0; this.eye = EYE[0];
     this.keys = {}; this.locked = false; this.enabled = false;
@@ -30,8 +42,8 @@ export class Player {
       if (e.repeat) return;
       this.keys[e.code] = true;
       if (!this.enabled) return;
-      if (e.code === 'KeyC') this.stance = this.stance === 1 ? 0 : 1;
-      if (e.code === 'KeyZ') this.stance = this.stance === 2 ? 0 : 2;
+      if (e.code === 'KeyC' && !this.swimming) this.stance = this.stance === 1 ? 0 : 1;
+      if (e.code === 'KeyZ' && !this.swimming) this.stance = this.stance === 2 ? 0 : 2;
       this.onKey && this.onKey(e.code);
     });
     addEventListener('keyup', (e) => { this.keys[e.code] = false; });
@@ -41,6 +53,33 @@ export class Player {
   lock() { this.dom.requestPointerLock && this.dom.requestPointerLock(); }
 
   forward(out) { return this.camera.getWorldDirection(out); }
+
+  // Keep the player out of walls, trees, boulders, tents and living soldiers, on the bridge deck, and inside the valley.
+  _collide() {
+    const P = this.pos, B = BRIDGE;
+    for (let pass = 0; pass < 2; pass++) if (!resolve(P, RADIUS, this.solids)) break;
+    for (const s of this.soldiers) {
+      if (!s.alive || Math.abs(s.pos.y - P.y) > 1.6) continue;
+      const dx = P.x - s.pos.x, dz = P.z - s.pos.z, d = Math.hypot(dx, dz), r = RADIUS + 0.32;
+      if (d < r && d > 1e-4) { P.x = s.pos.x + dx / d * r; P.z = s.pos.z + dz / d * r; }
+    }
+    // bridge: walk on from either bank, parapets keep you on the deck, swim under the arches
+    const g = groundAt(P.x, P.z);
+    if (P.z > B.z0 && P.z < B.z1 && Math.abs(P.x - B.x) < DECK) {
+      if (!this.onBridge) {
+        if (g > B.y - 0.6) this.onBridge = true;
+        else if (g > 0.4) P.x = B.x + (P.x < B.x ? -1 : 1) * (DECK + 0.01);     // no headroom under the deck here
+      }
+    } else this.onBridge = false;
+    if (this.onBridge) {
+      if (g < B.y + 0.9) P.x = Math.max(B.x - 2.1, Math.min(B.x + 2.1, P.x));    // between the parapets
+    } else if (g < B.y - 0.5) resolve(P, RADIUS, PIERS);
+    // edge of the playable valley
+    if (P.x < X0 || P.x > X1 || P.z < Z0 || P.z > Z1) {
+      P.x = Math.max(X0, Math.min(X1, P.x)); P.z = Math.max(Z0, Math.min(Z1, P.z));
+      this.onEdge && this.onEdge();
+    }
+  }
 
   update(dt) {
     const K = this.keys;
@@ -56,7 +95,8 @@ export class Player {
       } else this.lookT = 0;
       let f = (K.KeyW ? 1 : 0) - (K.KeyS ? 1 : 0), s = (K.KeyD ? 1 : 0) - (K.KeyA ? 1 : 0);
       const sprint = K.ShiftLeft && !this.scoped && this.stance === 0 && f > 0;
-      let sp = [4.2, 2.1, 0.8][this.stance] * (sprint ? 1.6 : 1) * (this.scoped ? 0.35 : 1);
+      const wet = Math.min(1, Math.max(0, (this.depth - 0.3) / 1.0));       // wading slows you, swimming more so
+      let sp = [4.2, 2.1, 0.8][this.stance] * (sprint && wet === 0 ? 1.6 : 1) * (this.scoped ? 0.35 : 1) * (1 - 0.58 * wet);
       const l = Math.hypot(f, s);
       if (l > 0) {
         f /= l; s /= l;
@@ -65,17 +105,11 @@ export class Player {
         this.pos.z += (-cy * f - sy * s) * sp * dt;
         this.bob += sp * dt * 1.9;
         this.stepAcc += sp * dt;
-        if (this.stepAcc > 2.2) { this.stepAcc = 0; this.audio.step(); }
+        if (this.stepAcc > 2.2) { this.stepAcc = 0; if (!this.swimming) this.audio.step(); }
       }
       this.moveAmt += ((l > 0 ? sp / 4.2 : 0) - this.moveAmt) * Math.min(1, dt * 8);
-      this.sprinting = sprint && l > 0;
-      // hold the ridge
-      const dx = this.pos.x - SPAWN.x, dz = this.pos.z - SPAWN.z, d = Math.hypot(dx, dz);
-      if (d > 48) { this.pos.x = SPAWN.x + dx / d * 48; this.pos.z = SPAWN.z + dz / d * 48; }
-      for (const o of this.obstacles) {
-        const ox = this.pos.x - o.x, oz = this.pos.z - o.z, od = Math.hypot(ox, oz), r = o.r + 0.4;
-        if (od < r && od > 1e-4) { this.pos.x = o.x + ox / od * r; this.pos.z = o.z + oz / od * r; }
-      }
+      this.sprinting = sprint && wet === 0 && l > 0;
+      this._collide();
       // breath
       this.holding = this.scoped && K.ShiftLeft && this.exhausted <= 0 && this.breath > 0;
       if (this.holding) {
@@ -86,9 +120,17 @@ export class Player {
       this.exhausted = Math.max(0, this.exhausted - dt);
     } else this.moveAmt *= 0.9;
 
-    this.pos.y = groundAt(this.pos.x, this.pos.z);
+    // footing: ground, bridge deck, or afloat in the river
+    const g = groundAt(this.pos.x, this.pos.z);
+    this.depth = this.onBridge ? 0 : Math.max(0, -g);
+    this.swimming = !this.onBridge && g < SWIM_Y;
+    if (this.swimming) this.stance = 0;
+    const footY = this.onBridge ? Math.max(g, BRIDGE.y) : Math.max(g, SWIM_Y);
+    const dy = footY - this.pos.y;
+    this.pos.y = Math.abs(dy) > 1.5 ? footY : this.pos.y + dy * Math.min(1, dt * 16);
     this.eye += (EYE[this.stance] - this.eye) * Math.min(1, dt * 7);
-    const bobY = Math.sin(this.bob * 2) * 0.035 * this.moveAmt, bobX = Math.cos(this.bob) * 0.02 * this.moveAmt;
+    const bobY = Math.sin(this.bob * 2) * 0.035 * this.moveAmt + (this.swimming ? Math.sin(this.t * 1.7) * 0.05 : 0);
+    const bobX = Math.cos(this.bob) * 0.02 * this.moveAmt;
 
     // scope sway: slow figure-eight plus tremor, calmer when crouched/prone or holding breath
     let amp = SWAY[this.stance] * (this.scoped ? 1 : 0.25) * (1 + this.moveAmt * 4);

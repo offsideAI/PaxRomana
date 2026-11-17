@@ -79,6 +79,7 @@ export function buildCastle(tex) {
   const B = new Builder();
   const group = new THREE.Group();
   const banners = [];
+  const solids = [];          // 2D footprints the player cannot walk through
   const top = WALK_Y;
   const hang = bannerMaterial(tex.banner, false), flagM = bannerMaterial(tex.banner, true);
 
@@ -141,6 +142,10 @@ export function buildCastle(tex) {
   }
   for (const [x, z] of [[45, 35], [-45, 35], [45, -35], [-45, -35]]) tower(x, z, 7, 20, 13);
   tower(46.5, 0, 5, 17, 9, false); tower(-46.5, 0, 5, 17, 9, false); tower(0, -36.5, 5, 17, 9, false);
+
+  solids.push({ x0: -47.1, x1: 47.1, z0: -37.1, z1: 37.1 }, { x0: -6, x1: 6, z0: 33, z1: 40.5 });
+  for (const [x, z] of [[45, 35], [-45, 35], [45, -35], [-45, -35]]) solids.push({ x, z, r: 7.8 });
+  for (const [x, z] of [[46.5, 0], [-46.5, 0], [0, -36.5], [-10.5, 37.5], [10.5, 37.5]]) solids.push({ x, z, r: 5.8 });
 
   // ---- gatehouse ----
   const gTop = PLATEAU + 17;
@@ -234,6 +239,7 @@ export function buildCastle(tex) {
       if (!h) return;
       const x = SPAWN.x + f[0] * 3.4 + r[0] * (k - 4) * 1.35, z = SPAWN.z + f[1] * 3.4 + r[1] * (k - 4) * 1.35;
       B.box('stone', 1.4, h + 1.2, 0.8, x, groundAt(x, z) + h / 2 - 0.6, z, ry + (B.rng() - 0.5) * 0.08);
+      solids.push({ x, z, r: 0.6 });
     });
     for (let i = 0; i < 5; i++) {
       const x = SPAWN.x + f[0] * (2 + B.rng() * 3) + r[0] * (B.rng() - 0.5) * 12, z = SPAWN.z + f[1] * (2 + B.rng() * 3) + r[1] * (B.rng() - 0.5) * 12;
@@ -250,9 +256,12 @@ export function buildCastle(tex) {
       const x = CAMP.x + gx * 8.2, z = CAMP.z + gz * 8.2;
       if (Math.hypot(x - CAMP.x, z - CAMP.z) > CAMP.r - 9) continue;
       B.prism('tent', 3.4, 2.4, 4.2, x, groundAt(x, z) - 0.05, z, (B.rng() - 0.5) * 0.12, 2);
+      solids.push({ x0: x - 1.6, x1: x + 1.6, z0: z - 2.1, z1: z + 2.1 });
     }
     // praetorium (command tent)
     B.prism('tentRed', 5.5, 3.6, 7, CAMP.x - 9, cy, CAMP.z - 9, Math.PI / 2, 2);
+    solids.push({ x0: CAMP.x - 12.5, x1: CAMP.x - 5.5, z0: CAMP.z - 11.6, z1: CAMP.z - 6.4 });
+    solids.push({ x: CAMP.x, z: CAMP.z, r: CAMP.r, gap: 0.075 });        // palisade, gateway to the south
     // palisade with a south gate
     const n = Math.floor((2 * Math.PI * CAMP.r) / 0.52);
     for (let i = 0; i < n; i++) {
@@ -266,6 +275,7 @@ export function buildCastle(tex) {
     // watchtower
     const tx = CAMP.x + 26, tz = CAMP.z + 34, tg = groundAt(tx, tz);
     for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+      solids.push({ x: tx + sx * 1.6, z: tz + sz * 1.6, r: 0.25 });
       B.box('timber', 0.3, 10.6, 0.3, tx + sx * 1.6, tg + 5.3, tz + sz * 1.6, 0, 1.5);
       B.box('timber', 0.14, 4.6, 0.14, tx + sx * 1.6, tg + 3.4, tz, 0, 1.5, sx * sz * 0.75);
     }
@@ -274,6 +284,7 @@ export function buildCastle(tex) {
     B.add('timber', new THREE.ConeGeometry(3.2, 1.6, 4, 1).rotateY(Math.PI / 4).translate(tx, tg + 11.3, tz));
     // aquila standard
     B.cyl('timber', 0.05, 0.06, 5.2, CAMP.x, cy + 2.6, CAMP.z + 3, 6, 1.5);
+    solids.push({ x: CAMP.x, z: CAMP.z + 3, r: 0.15 });
     B.box('gold', 1.3, 0.12, 0.08, CAMP.x, cy + 4.3, CAMP.z + 3);
     B.add('gold', new THREE.SphereGeometry(0.22, 10, 8).scale(1, 1.2, 0.8).translate(CAMP.x, cy + 5.45, CAMP.z + 3));
     B.box('gold', 1.1, 0.14, 0.3, CAMP.x, cy + 5.55, CAMP.z + 3, 0, 4, 0.0);
@@ -286,6 +297,7 @@ export function buildCastle(tex) {
       for (let i = 0; i < 9; i++) { const a = i / 9 * 6.283; B.box('stone', 0.35, 0.3, 0.3, x + Math.sin(a) * 0.7, cy + 0.1, z + Math.cos(a) * 0.7, a); }
       B.add('ember', new THREE.SphereGeometry(0.42, 8, 6).scale(1, 0.45, 1).translate(x, cy + 0.15, z));
       smoke.push(new THREE.Vector3(x, cy + 0.5, z));
+      solids.push({ x, z, r: 0.85 });
     }
   }
   smoke.push(new THREE.Vector3(-36.5, PLATEAU + 21, 8), new THREE.Vector3(-36.5, PLATEAU + 21, -18));
@@ -305,5 +317,5 @@ export function buildCastle(tex) {
   const meshes = B.build(mats, group);
   for (const b of banners) { b.castShadow = true; group.add(b); }
   const colliders = ['stone', 'slate', 'timber', 'tent', 'tentRed', 'iron'].map((k) => meshes[k]).filter(Boolean);
-  return { group, colliders, smoke, keep: { x: KX, z: KZ, top: kTop, half: KW / 2 }, gateTop: gTop };
+  return { group, colliders, solids, smoke, keep: { x: KX, z: KZ, top: kTop, half: KW / 2 }, gateTop: gTop };
 }
