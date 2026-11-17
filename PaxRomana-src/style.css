@@ -119,3 +119,14 @@ button:disabled { cursor: default; filter: grayscale(0.7) brightness(0.6); }
 #keys tbody td:last-child { font-weight: 400; opacity: 0.8; }
 #keys tbody tr { border-top: 1px solid rgba(255, 255, 255, 0.08); }
 #keys .foot { margin-top: 14px; font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; opacity: 0.7; text-align: center; }
+
+/* heist: interaction prompt and loot bag */
+#prompt { position: absolute; left: 50%; bottom: 27%; transform: translateX(-50%); font: 500 17px var(--ui); letter-spacing: 0.1em; padding: 9px 18px; background: rgba(10, 9, 7, 0.62); border: 1px solid rgba(210, 174, 99, 0.45); opacity: 0; transition: opacity 0.15s; white-space: nowrap; }
+#prompt.show { opacity: 1; }
+#prompt kbd { display: inline-block; min-width: 22px; text-align: center; margin-right: 10px; padding: 1px 6px; font: 600 15px var(--ui); color: #14110c; background: var(--gold); border-radius: 3px; }
+#bag { position: absolute; top: 172px; left: 32px; padding-left: 14px; border-left: 2px solid var(--gold-dim); font: 500 15px/1.5 var(--ui); letter-spacing: 0.05em; display: none; }
+#bag.show { display: block; }
+#bag label { display: block; font-size: 11px; letter-spacing: 0.26em; text-transform: uppercase; opacity: 0.7; }
+#bag div { text-transform: capitalize; }
+#bag b { display: block; color: var(--gold); font-weight: 600; letter-spacing: 0.1em; }
+body.cine #prompt, body.cine #bag { opacity: 0; }

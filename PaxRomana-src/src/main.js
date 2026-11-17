@@ -13,6 +13,7 @@ import { Player, BASE_FOV } from './player.js';
 import { Weapon } from './weapon.js';
 import { buildPost } from './post.js';
 import { HUD } from './hud.js';
+import { Heist } from './heist.js';
 
 const hud = new HUD();
 const params = new URLSearchParams(location.search);
@@ -51,6 +52,7 @@ async function boot() {
   castle.smoke.forEach((p, i) => fx.addSmoke(p, i < 2 ? 1 : 1.5));
   const audio = new Audio();
   const player = new Player(camera, canvas, [...castle.solids, ...veg.obstacles], audio, legion.soldiers);
+  const heist = new Heist(castle, player, hud, audio);
   const world = { colliders: castle.colliders, legion, fx, audio, onKill: null, onMiss: null };
   const weapon = new Weapon(scene, camera, player, world, tex);
   const post = buildPost(renderer, scene, camera);
@@ -71,7 +73,6 @@ async function boot() {
     hud.hitmarker(r.head);
     const who = r.soldier.centurion ? 'Centurion' : 'Legionary';
     hud.feed(`${who} down <em>${Math.round(r.dist)} m</em>${r.head ? ' <b>HEADSHOT</b>' : ''}`, r.head ? 'head' : '');
-    if (legion.alive === 0) { state.endT = 3.2; state.win = true; }
   };
 
   function measure() {
@@ -136,6 +137,8 @@ async function boot() {
     if (code === 'Equal' || code === 'NumpadAdd') weapon.cycleZoom(1);
     if (code === 'Minus' || code === 'NumpadSubtract') weapon.cycleZoom(-1);
     if (code === 'KeyH') hud.toggleKeys();
+    if (code === 'KeyO' && !kc.active) heist.useDoor();
+    if (code === 'KeyL' && !kc.active) heist.take();
   };
   let edgeT = 0;
   player.onEdge = () => { if (edgeT <= 0) { edgeT = 6; hud.hint('Edge of the valley — the mission lies behind you', 3000); } };
@@ -173,7 +176,7 @@ async function boot() {
     player.lock();
     if (!state.started) {
       state.started = true;
-      setTimeout(() => hud.hint('Press H for all keyboard and mouse controls', 7000), 1200);
+      setTimeout(() => hud.hint('Reach the castle · O opens doors · L takes loot · H shows all controls', 9000), 1200);
     }
   });
   addEventListener('resize', () => {
@@ -233,6 +236,8 @@ async function boot() {
     if (!paused) {
       if (!kc.active) player.update(dtReal);
       if (player.swimming) weapon.wantAds = false;
+      if (!kc.active && state.started) heist.update(dtReal);
+      if (heist.escaped && state.endT < 0 && !state.over) { state.endT = 1.6; state.win = true; }
       veg.update(player.pos.x, player.pos.z);
       edgeT -= dtReal; spotT -= dt;
       if (spotT <= 0 && state.started && !state.over && !kc.active) { spotT = 0.5; watch(); }
@@ -277,13 +282,12 @@ async function boot() {
         wind = `${cross > 0.15 ? '→' : cross < -0.15 ? '←' : '·'} ${sp} m/s`;
       }
       hud.scope(scoped, { range, zero: weapon.zero, zoom: weapon.zoom, wind, breath: player.breath, exhausted: player.exhausted > 0 });
-      if (!state.over && weapon.mag === 0 && weapon.reserve === 0 && weapon.bullets.length === 0 && legion.alive > 0 && state.endT < 0) { state.endT = 2; state.win = false; }
       if (state.endT > 0 && !kc.active) {
         state.endT -= dtReal;
         if (state.endT <= 0) {
           state.over = true; player.enabled = false;
           document.exitPointerLock && document.exitPointerLock();
-          hud.end(state.win, { ...weapon.stats, kills: legion.total - legion.alive, total: legion.total, time: state.time, alarms: state.alarms });
+          hud.end(state.win, { ...weapon.stats, kills: legion.total - legion.alive, total: legion.total, time: state.time, alarms: state.alarms, taken: heist.taken, treasures: heist.treasures, value: heist.value });
         }
       }
     } else {

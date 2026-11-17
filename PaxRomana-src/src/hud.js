@@ -8,6 +8,7 @@ export class HUD {
       cross: $('crosshair'), marker: $('hitmarker'), mag: $('mag'), reserve: $('reserve'), rounds: $('rounds'), stance: $('stance'),
       scope: $('scope'), range: $('range'), zero: $('zero'), zoom: $('zoom'), wind: $('wind'), breath: $('breathFill'),
       menu: $('menu'), start: $('start'), load: $('loadFill'), loadText: $('loadText'), end: $('end'), hint: $('hint'), keys: $('keys'), status: $('reloadMsg'),
+      objLine: $('objLine'), prompt: $('prompt'), bag: $('bag'),
     };
     this._cache = {};
   }
@@ -20,6 +21,12 @@ export class HUD {
     this.el.menu.classList.toggle('hidden', !v);
     if (resume) { this.el.start.textContent = 'Resume'; }
     this.el.hud.classList.toggle('hidden', v);
+  }
+  objectiveLine(text) { this.el.objLine.textContent = text; }
+  prompt(html) { if (this._cache.prompt !== html) { this._cache.prompt = html; this.el.prompt.innerHTML = html; this.el.prompt.classList.toggle('show', !!html); } }
+  bag(items, value) {
+    this.el.bag.innerHTML = `<label>Loot bag</label>${items.map((i) => `<div>${i.name.replace(/^(the|a) /, '')}</div>`).join('')}${value ? `<b>${value.toLocaleString('en')} aurei</b>` : ''}`;
+    this.el.bag.classList.add('show');
   }
   objective(k, total) { this._set('k', this.el.kills, String(k)); this._set('t', this.el.total, String(total)); }
   alert(v, alarm) { this.el.alert.style.width = `${v}%`; this.el.alertBox.classList.toggle('alarm', alarm); }
@@ -68,8 +75,8 @@ export class HUD {
     this.el.end.innerHTML = `
       <div class="panel">
         <div class="eyebrow">${win ? 'Mission accomplished' : 'Mission failed'}</div>
-        <h1>${win ? 'The garrison is silent' : 'Out of ammunition'}</h1>
-        <p class="sub">${win ? 'Château de Montvallon stands unguarded. The road to Lutetia is open.' : 'The legion still holds Montvallon. Rome endures another day.'}</p>
+        <h1>${win ? 'The Crown Jewels are yours' : 'Mission failed'}</h1>
+        <p class="sub">${win ? 'The regalia of Gaul leave Montvallon in a rifleman\'s loot bag. Rome will notice.' : 'The legion still holds Montvallon. Rome endures another day.'}</p>
         <div class="stats">
           <div><b>${s.kills}/${s.total}</b><span>Legionaries</span></div>
           <div><b>${acc}%</b><span>Accuracy</span></div>
@@ -77,6 +84,8 @@ export class HUD {
           <div><b>${Math.round(s.longest)} m</b><span>Longest shot</span></div>
           <div><b>${mm}:${ss}</b><span>Time</span></div>
           <div><b>${s.alarms}</b><span>Alarms raised</span></div>
+          <div><b>${s.taken}/${s.treasures}</b><span>Treasures</span></div>
+          <div><b>${s.value.toLocaleString('en')}</b><span>Aurei</span></div>
         </div>
         <div class="rating">${rating}</div>
         <button id="again" onclick="location.reload()">Deploy again</button>

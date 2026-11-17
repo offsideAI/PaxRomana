@@ -69,6 +69,10 @@ export class Legion {
     add({ route: R([[CAMP.x + 4.6, CAMP.z + 4.6], [CAMP.x - 3, CAMP.z + 20]]), hold: true, face: 0.8 });
     add({ route: R([[CAMP.x, CAMP.z + 40], [CAMP.x, CAMP.z - 30]]), s: 20 });
 
+    // inside the walls: a sentry crossing the courtyard and the vault guard in the keep
+    add({ route: R([[-24, 26], [24, 26]]), s: 14 });
+    add({ route: R([[4.5, -6.5], [-3, -6.5]]), hold: true, face: 0 });
+
     this.total = this.soldiers.length;
   }
 

@@ -1,11 +1,13 @@
 // 2D player collision against static solids: circles (trees, boulders, towers), axis-aligned boxes
 // (walls, tents) and rings with a gateway (the camp palisade).
+// Any solid with `off: true` is skipped (open doors).
 //   circle: { x, z, r }      box: { x0, x1, z0, z1 }      ring: { x, z, r, gap }  (gap = half-angle of the gateway, facing +z)
 
 export function resolve(pos, rad, solids) {
   let hit = false;
   for (let i = 0; i < solids.length; i++) {
     const s = solids[i];
+    if (s.off) continue;                    // an open door
     if (s.x0 !== undefined) {
       const a = pos.x - (s.x0 - rad), b = (s.x1 + rad) - pos.x, c = pos.z - (s.z0 - rad), d = (s.z1 + rad) - pos.z;
       if (a <= 0 || b <= 0 || c <= 0 || d <= 0) continue;

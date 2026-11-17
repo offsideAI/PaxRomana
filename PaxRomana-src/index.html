@@ -15,11 +15,13 @@
   <div id="hud" class="hidden">
     <div id="objective">
       <div class="eyebrow">Objective</div>
-      <div class="line">Silence the garrison of Montvallon</div>
+      <div class="line" id="objLine">Break into Château de Montvallon</div>
       <div class="count"><span id="kills">0</span><small>/</small><span id="total">0</span><em>legionaries</em></div>
       <div id="alert"><label>Garrison alert</label><div class="bar"><div id="alertFill"></div></div></div>
     </div>
+    <div id="bag"></div>
     <div id="feed"></div>
+    <div id="prompt"></div>
     <div id="hint"></div>
     <div id="crosshair"><i></i><i></i><i></i><i></i></div>
     <div id="hitmarker"><i></i><i></i><i></i><i></i></div>
@@ -62,6 +64,8 @@
           <tr><th>Move (anywhere in the valley)</th><td>W A S D</td><td>—</td></tr>
           <tr><th>Crouch / prone</th><td>C / Z (again to stand)</td><td>—</td></tr>
           <tr><th>Reload</th><td>R</td><td>—</td></tr>
+          <tr><th>Open / close door</th><td>O</td><td>—</td></tr>
+          <tr><th>Take loot</th><td>L</td><td>—</td></tr>
           <tr><th>Skip kill-cam</th><td>Space</td><td>Left button</td></tr>
           <tr><th>Pause / resume</th><td>Esc / Enter</td><td>Esc / click</td></tr>
           <tr><th>This overlay</th><td>H</td><td>—</td></tr>
@@ -88,8 +92,8 @@
       <div class="brief">
         <div>
           <h3>Mission</h3>
-          <p>Eliminate every legionary guarding <b>Château de Montvallon</b> — the wall-walks, the keep, the gate, the bridge and the marching camp below.</p>
-          <p>Missed shots and fallen comrades raise the alarm. An alerted garrison runs.</p>
+          <p>Break into <b>Château de Montvallon</b>, find the key to the keep vault, and carry the <b>Crown Jewels</b> out through the gate in your loot bag.</p>
+          <p>Thin out the garrison from the ridge first. Sentries who see you, missed shots and fallen comrades raise the alarm.</p>
         </div>
         <div>
           <h3>Controls</h3>
@@ -98,6 +102,7 @@
             <li><kbd>Space</kbd> / LMB fire <kbd>F</kbd> / RMB scope</li>
             <li><kbd>+</kbd><kbd>−</kbd> / wheel zoom <kbd>Q</kbd><kbd>E</kbd> zero</li>
             <li><kbd>Shift</kbd> hold breath <kbd>R</kbd> reload</li>
+            <li><kbd>O</kbd> open / close doors <kbd>L</kbd> take loot</li>
             <li><kbd>H</kbd> show all controls in game</li>
           </ul>
         </div>

@@ -98,6 +98,9 @@ export class Audio {
     }
   }
   heartbeat() { if (this.ctx) { const t = this.ctx.currentTime; this._tone(t, 0.12, 'sine', 62, 40, 0.5); this._tone(t + 0.17, 0.12, 'sine', 54, 36, 0.35); } }
+  door() { if (this.ctx) { const t = this.ctx.currentTime; this._noise(this.brown, t, 0.55, 'bandpass', 260, 520, 0.3, { q: 6, attack: 0.05 }); this._noise(this.brown, t + 0.5, 0.16, 'lowpass', 300, 80, 0.5); } }
+  locked() { if (this.ctx) { const t = this.ctx.currentTime; this._noise(this.white, t, 0.05, 'bandpass', 1800, 900, 0.25, { q: 3 }); this._noise(this.white, t + 0.11, 0.05, 'bandpass', 1500, 800, 0.2, { q: 3 }); } }
+  loot() { if (this.ctx) { const t = this.ctx.currentTime; [1320, 1760, 2640].forEach((f, i) => this._tone(t + i * 0.07, 0.35, 'sine', f, f, 0.12)); } }
   step() { if (this.ctx) this._noise(this.brown, this.ctx.currentTime, 0.11, 'bandpass', 500 + Math.random() * 300, 250, 0.22, { q: 0.7 }); }
 
   _ambience() {

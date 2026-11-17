@@ -90,6 +90,32 @@ export function buildCastle(tex) {
     B.box('stone', w + 0.5, 0.22, 0.5, x, y - h / 2 - 0.1, z, ry);
   };
 
+  // A straight wall with doorways. alongX: runs from a to b in x, occupying c0..c1 in z (else the other way round).
+  // gaps: [{ at, w, h }] centre, width and height of each doorway. Adds masonry and matching walk-blocking footprints.
+  function run(alongX, a, b, c0, c1, y0, y1, gaps = []) {
+    const seg = (u0, u1, ya, yb, solid) => {
+      if (u1 - u0 < 0.01) return;
+      const cm = (c0 + c1) / 2, um = (u0 + u1) / 2, ym = (ya + yb) / 2;
+      if (alongX) B.box('stone', u1 - u0, yb - ya, c1 - c0, um, ym, cm); else B.box('stone', c1 - c0, yb - ya, u1 - u0, cm, ym, um);
+      if (solid) solids.push(alongX ? { x0: u0, x1: u1, z0: c0, z1: c1 } : { x0: c0, x1: c1, z0: u0, z1: u1 });
+    };
+    let cur = a;
+    for (const g of [...gaps].sort((p, q) => p.at - q.at)) {
+      seg(cur, g.at - g.w / 2, y0, y1, true);
+      seg(g.at - g.w / 2, g.at + g.w / 2, PLATEAU + g.h, y1, false);      // lintel
+      cur = g.at + g.w / 2;
+    }
+    seg(cur, b, y0, y1, true);
+  }
+  // Hollow rectangular building: doors = { N: [...], S: [...], E: [...], W: [...] } (N is -z, S is +z).
+  function shell(x0, x1, z0, z1, y0, y1, th, doors = {}) {
+    run(true, x0, x1, z1 - th, z1, y0, y1, doors.S);
+    run(true, x0, x1, z0, z0 + th, y0, y1, doors.N);
+    run(false, z0 + th, z1 - th, x0, x0 + th, y0, y1, doors.W);
+    run(false, z0 + th, z1 - th, x1 - th, x1, y0, y1, doors.E);
+    B.box('stone', x1 - x0 - th * 2, 0.1, z1 - z0 - th * 2, (x0 + x1) / 2, PLATEAU, (z0 + z1) / 2, 0, 2);   // flagstone floor
+  }
+
   // ---- curtain walls ----
   function wall(ax, az, bx, bz, nx, nz) {
     const len = Math.hypot(bx - ax, bz - az), cx = (ax + bx) / 2, cz = (az + bz) / 2;
@@ -99,6 +125,7 @@ export function buildCastle(tex) {
     B.box('stone', len, 0.45, 0.5, cx + nx * 1.7, top - 0.25, cz + nz * 1.7, ry);   // corbel table
     B.box('stone', len, 1.0, 0.55, cx + nx * 1.55, top + 0.5, cz + nz * 1.55, ry);  // parapet
     B.box('stone', len, 0.35, 0.4, cx - nx * 1.3, top + 0.17, cz - nz * 1.3, ry);   // inner kerb
+    solids.push({ x0: Math.min(ax, bx) - (nx ? 1.9 : 0), x1: Math.max(ax, bx) + (nx ? 1.9 : 0), z0: Math.min(az, bz) - (nz ? 1.9 : 0), z1: Math.max(az, bz) + (nz ? 1.9 : 0) });
     const n = Math.floor(len / 2.5);
     for (let i = 0; i < n; i++) {
       const t = (i + 0.5) / n;
@@ -143,21 +170,25 @@ export function buildCastle(tex) {
   for (const [x, z] of [[45, 35], [-45, 35], [45, -35], [-45, -35]]) tower(x, z, 7, 20, 13);
   tower(46.5, 0, 5, 17, 9, false); tower(-46.5, 0, 5, 17, 9, false); tower(0, -36.5, 5, 17, 9, false);
 
-  solids.push({ x0: -47.1, x1: 47.1, z0: -37.1, z1: 37.1 }, { x0: -6, x1: 6, z0: 33, z1: 40.5 });
   for (const [x, z] of [[45, 35], [-45, 35], [45, -35], [-45, -35]]) solids.push({ x, z, r: 7.8 });
   for (const [x, z] of [[46.5, 0], [-46.5, 0], [0, -36.5], [-10.5, 37.5], [10.5, 37.5]]) solids.push({ x, z, r: 5.8 });
 
   // ---- gatehouse ----
   const gTop = PLATEAU + 17;
   tower(-10.5, 37.5, 5, 19, 10); tower(10.5, 37.5, 5, 19, 10);
-  B.box('stone', 12, 17 + 12, 7, 0, gTop - 14.5, 36.5);
+  const GW = 2.3, GH = 5.2;                                        // gateway half-width and height
+  for (const sx of [-1, 1]) {
+    B.box('stone', 6 - GW, 17 + 12, 7, sx * (6 + GW) / 2, gTop - 14.5, 36.5);
+    solids.push({ x0: sx > 0 ? GW : -6, x1: sx > 0 ? 6 : -GW, z0: 33, z1: 40.5 });
+  }
+  B.box('stone', GW * 2, 17 - GH, 7, 0, (gTop + PLATEAU + GH) / 2, 36.5);
   B.box('stone', 12, 1.0, 0.55, 0, gTop + 0.5, 39.75);
   for (let i = 0; i < 4; i++) B.box('stone', 1.45, 0.95, 0.55, -4.1 + i * 2.75, gTop + 1.47, 39.75);
   B.box('stone', 12, 0.5, 0.6, 0, gTop - 0.3, 40.2);
-  B.box('dark', 4.6, 5.2, 0.5, 0, PLATEAU + 2.6, 39.85);
   B.add('dark', new THREE.CylinderGeometry(2.3, 2.3, 0.5, 20).rotateX(Math.PI / 2).translate(0, PLATEAU + 5.2, 39.85));
-  for (let i = -3; i <= 3; i++) B.box('iron', 0.1, 7.2, 0.1, i * 0.66, PLATEAU + 3.6, 40.15);
-  for (let i = 0; i < 6; i++) B.box('iron', 4.5, 0.1, 0.1, 0, PLATEAU + 0.8 + i * 1.1, 40.15);
+  // portcullis, raised into the arch
+  for (let i = -3; i <= 3; i++) B.box('iron', 0.1, 2.5, 0.1, i * 0.66, PLATEAU + GH + 1.2, 40.15);
+  for (let i = 0; i < 2; i++) B.box('iron', 4.5, 0.1, 0.1, 0, PLATEAU + GH + 0.5 + i * 1.1, 40.15);
   slit(-3.5, PLATEAU + 11, 40, 0); slit(3.5, PLATEAU + 11, 40, 0);
   {
     const b = new THREE.Mesh(new THREE.PlaneGeometry(3, 6.4, 6, 14), hang);
@@ -167,7 +198,10 @@ export function buildCastle(tex) {
 
   // ---- keep (donjon) ----
   const KX = 0, KZ = -10, KW = 17, kTop = PLATEAU + 32;
-  B.box('stone', KW, 36, KW, KX, kTop - 18, KZ);
+  const KH = KW / 2, ROOM = 5;                                      // ground-floor rooms are 5 m high
+  B.box('stone', KW, 32 - ROOM, KW, KX, (kTop + PLATEAU + ROOM) / 2, KZ);
+  shell(KX - KH, KX + KH, KZ - KH, KZ + KH, PLATEAU - 4, PLATEAU + ROOM, 1.5, { S: [{ at: KX, w: 1.8, h: 2.8 }] });
+  run(true, KX - KH + 1.5, KX + KH - 1.5, KZ - 0.3, KZ + 0.3, PLATEAU, PLATEAU + ROOM, [{ at: KX, w: 1.6, h: 2.6 }]);   // vault wall
   B.box('stone', KW + 1.2, 0.6, KW + 1.2, KX, kTop - 0.3, KZ);
   for (const [nx, nz] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
     const ry = nx ? Math.PI / 2 : 0, o = KW / 2 + 0.25;
@@ -205,17 +239,52 @@ export function buildCastle(tex) {
   }
 
   // ---- great hall, chapel ----
-  B.box('stone', 13, 12, 46, -36.5, PLATEAU + 5, -5);
+  shell(-43, -30, -28, 18, PLATEAU - 1, PLATEAU + 11, 1, { E: [{ at: -5, w: 1.8, h: 2.8 }] });
   B.prism('slate', 14.4, 7.5, 47.5, -36.5, PLATEAU + 11, -5);
   for (let i = 0; i < 6; i++) win(-29.95, PLATEAU + 5.5, -24 + i * 7.6, Math.PI / 2, 1.1, 3);
   B.box('stone', 1.6, 7, 1.6, -36.5, PLATEAU + 17, 8); B.box('stone', 1.6, 7, 1.6, -36.5, PLATEAU + 17, -18);
-  B.box('stone', 12, 10, 20, 36, PLATEAU + 4, -22);
+  shell(30, 42, -32, -12, PLATEAU - 1, PLATEAU + 9, 1, { W: [{ at: -22, w: 1.6, h: 2.7 }] });
+  solids.push({ x0: 34.3, x1: 37.7, z0: -12.2, z1: -8.8 });
   B.prism('slate', 13.2, 7, 21.4, 36, PLATEAU + 9, -22);
   B.box('stone', 3.4, 20, 3.4, 36, PLATEAU + 9, -10.5);
   B.add('slate', new THREE.ConeGeometry(2.9, 8, 4, 1).rotateY(Math.PI / 4).translate(36, PLATEAU + 23, -10.5));
   B.box('gold', 0.1, 1.6, 0.1, 36, PLATEAU + 27.6, -10.5); B.box('gold', 0.8, 0.1, 0.1, 36, PLATEAU + 27.9, -10.5);
   for (let i = 0; i < 3; i++) win(36 + (i - 1) * 3.4, PLATEAU + 5, -11.95 + 0, 0, 0.8, 2.2);
   slit(36, PLATEAU + 16, -8.75, 0, 0.5, 1.6);
+
+  // ---- furnishings ----
+  const torches = [];
+  const torch = (x, y, z) => { B.box('iron', 0.08, 0.5, 0.08, x, y - 0.3, z); B.add('ember', new THREE.SphereGeometry(0.13, 8, 6).scale(1, 1.5, 1).translate(x, y, z)); torches.push(new THREE.Vector3(x, y, z)); };
+  const block = (key, w, h, d, x, z, y = 0) => { B.box(key, w, h, d, x, PLATEAU + y + h / 2, z, 0, 2); solids.push({ x0: x - w / 2, x1: x + w / 2, z0: z - d / 2, z1: z + d / 2 }); };
+  {
+    // great hall: long table, benches, hearth
+    B.box('timber', 1.7, 0.12, 16, -36.5, PLATEAU + 0.92, -5, 0, 2);
+    for (const z of [-12, -5, 2]) B.box('timber', 1.3, 0.86, 0.2, -36.5, PLATEAU + 0.43, z, 0, 2);
+    solids.push({ x0: -37.35, x1: -35.65, z0: -13, z1: 3 });
+    for (const sx of [-1, 1]) block('timber', 0.45, 0.5, 14, -36.5 + sx * 1.6, -5);
+    B.box('dark', 0.5, 2.4, 3.4, -41.9, PLATEAU + 1.2, 8); B.box('stone', 0.7, 0.4, 4.4, -41.8, PLATEAU + 2.6, 8);
+    B.add('ember', new THREE.SphereGeometry(0.5, 8, 6).scale(0.5, 0.3, 1.6).translate(-41.6, PLATEAU + 0.2, 8));
+    torch(-31.3, PLATEAU + 3.2, 6); torches.pop(); torch(-31.3, PLATEAU + 3.2, -16); torches.pop();
+    torches.push(new THREE.Vector3(-37, PLATEAU + 4.5, -5));
+    // chapel: altar, cross, pews
+    block('stone', 2.6, 1.1, 1.0, 36, -29.4);
+    B.box('gold', 0.12, 1.5, 0.12, 36, PLATEAU + 3.0, -30.85); B.box('gold', 0.8, 0.12, 0.12, 36, PLATEAU + 3.3, -30.85);
+    for (const z of [-17, -19.5, -24.5, -27]) block('timber', 5, 0.55, 0.5, 36.6, z);
+    torches.push(new THREE.Vector3(36, PLATEAU + 4.2, -22));
+    // keep antechamber: barrels and a weapon rack; vault: plinth for the regalia, strongboxes
+    for (const [x, z] of [[-5.6, -4.2], [-4.4, -4.4], [-5.5, -5.5]]) { B.cyl('timber', 0.45, 0.4, 1.0, x, PLATEAU + 0.5, z, 12, 1.5); solids.push({ x, z, r: 0.48 }); }
+    block('timber', 2.6, 1.9, 0.35, 5, -3.35);
+    for (let i = 0; i < 5; i++) B.cyl('iron', 0.025, 0.025, 2.3, 4 + i * 0.5, PLATEAU + 1.2, -3.6, 5);
+    torch(-6.7, PLATEAU + 2.9, -6.5); torch(6.7, PLATEAU + 2.9, -14);
+    block('stone', 0.9, 1.0, 0.9, 0, -15.6);
+    B.box('stone', 1.2, 0.12, 1.2, 0, PLATEAU + 1.04, -15.6);
+    for (const [x, z] of [[5, -16.2], [5.4, -12.6]]) { block('timber', 1.3, 0.75, 0.8, x, z); B.box('iron', 1.34, 0.08, 0.84, x, PLATEAU + 0.5, z); }
+    // courtyard well
+    B.cyl('stone', 1.25, 1.35, 0.9, -16, PLATEAU + 0.45, 16, 20); B.add('dark', new THREE.CylinderGeometry(0.95, 0.95, 0.06, 20).translate(-16, PLATEAU + 0.9, 16));
+    for (const sx of [-1, 1]) B.box('timber', 0.16, 2.2, 0.16, -16 + sx * 1.2, PLATEAU + 1.6, 16, 0, 1.5);
+    B.box('timber', 2.8, 0.16, 0.16, -16, PLATEAU + 2.7, 16, 0, 1.5);
+    solids.push({ x: -16, z: 16, r: 1.4 });
+  }
 
   // ---- bridge over the river ----
   {
@@ -317,5 +386,75 @@ export function buildCastle(tex) {
   const meshes = B.build(mats, group);
   for (const b of banners) { b.castShadow = true; group.add(b); }
   const colliders = ['stone', 'slate', 'timber', 'tent', 'tentRed', 'iron'].map((k) => meshes[k]).filter(Boolean);
-  return { group, colliders, solids, smoke, keep: { x: KX, z: KZ, top: kTop, half: KW / 2 }, gateTop: gTop };
+
+  // ---- doors: each leaf swings on a hinge; `solid` blocks the doorway until the door is open ----
+  const doors = [];
+  function door(name, mat, h, box, leaves, extra = {}) {
+    const d = { name, solid: { ...box, off: false }, x: (box.x0 + box.x1) / 2, z: (box.z0 + box.z1) / 2, reach: 2.6 + Math.max(box.x1 - box.x0, box.z1 - box.z0) / 2, amt: 0, want: 0, locked: false, leaves: [], ...extra };
+    for (const [hx, hz, w, closed, open] of leaves) {
+      const pivot = new THREE.Group();
+      pivot.position.set(hx, PLATEAU, hz); pivot.rotation.y = closed;
+      const leaf = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.14).translate(w / 2, h / 2, 0), mat);
+      leaf.castShadow = leaf.receiveShadow = true;
+      pivot.add(leaf);
+      for (const y of [0.18, 0.5, 0.82]) pivot.add(new THREE.Mesh(new THREE.BoxGeometry(w * 0.9, 0.09, 0.19).translate(w * 0.47, h * y, 0), mats.iron));
+      group.add(pivot); colliders.push(leaf);
+      d.leaves.push({ pivot, closed, open });
+    }
+    solids.push(d.solid); doors.push(d);
+    return d;
+  }
+  const HP = Math.PI / 2;
+  door('the castle gate', mats.timber, GH, { x0: -GW, x1: GW, z0: 39.2, z1: 39.8 }, [[-GW, 39.5, GW, 0, HP], [GW, 39.5, GW, Math.PI, HP]]);
+  door('the great hall door', mats.timber, 2.8, { x0: -30.8, x1: -30.2, z0: -5.9, z1: -4.1 }, [[-30.5, -5.9, 1.8, -HP, -Math.PI]]);
+  door('the chapel door', mats.timber, 2.7, { x0: 30.2, x1: 30.8, z0: -22.8, z1: -21.2 }, [[30.5, -22.8, 1.6, -HP, 0]]);
+  door('the keep door', mats.timber, 2.8, { x0: KX - 0.9, x1: KX + 0.9, z0: KZ + KH - 1.05, z1: KZ + KH - 0.45 }, [[KX - 0.9, KZ + KH - 0.75, 1.8, 0, HP]]);
+  door('the vault door', mats.iron, 2.6, { x0: KX - 0.8, x1: KX + 0.8, z0: KZ - 0.3, z1: KZ + 0.3 }, [[KX - 0.8, KZ, 1.6, 0, HP]], { locked: true });
+
+  // ---- loot ----
+  const gem = (c) => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.7, roughness: 0.15, metalness: 0.3 });
+  const silver = new THREE.MeshStandardMaterial({ color: 0xd8dde4, roughness: 0.25, metalness: 1 });
+  const ruby = gem(0xc0122c), sapphire = gem(0x1b4fd0), emerald = gem(0x109a55);
+  const loot = [];
+  function item(name, value, x, y, z, parts, extra = {}) {
+    const g = new THREE.Group();
+    for (const [geo, mat] of parts) { const m = new THREE.Mesh(geo, mat); m.castShadow = true; g.add(m); }
+    g.position.set(x, PLATEAU + y, z);
+    group.add(g);
+    loot.push({ name, value, x, z, mesh: g, taken: false, ...extra });
+  }
+  const G = mats.gold;
+  item('the vault key', 0, -36.5, 1.0, 1.6, [
+    [new THREE.TorusGeometry(0.07, 0.02, 6, 14).rotateX(HP), G], [new THREE.BoxGeometry(0.03, 0.03, 0.26).translate(0, 0, 0.2), G],
+    [new THREE.BoxGeometry(0.09, 0.03, 0.03).translate(0.04, 0, 0.3), G], [new THREE.BoxGeometry(0.07, 0.03, 0.03).translate(0.03, 0, 0.24), G],
+  ], { key: true });
+  item('a silver salver', 120, -36.5, 0.99, -9, [
+    [new THREE.CylinderGeometry(0.3, 0.26, 0.03, 20), silver], [new THREE.TorusGeometry(0.3, 0.018, 6, 20).rotateX(HP).translate(0, 0.02, 0), silver],
+  ]);
+  item('the golden chalice', 400, 36, 1.1, -29.4, [
+    [new THREE.CylinderGeometry(0.09, 0.1, 0.03, 14), G], [new THREE.CylinderGeometry(0.02, 0.02, 0.16, 8).translate(0, 0.09, 0), G],
+    [new THREE.CylinderGeometry(0.1, 0.04, 0.14, 14, 1, true).translate(0, 0.24, 0), G], [new THREE.SphereGeometry(0.035, 8, 6).translate(0, 0.1, 0), ruby],
+  ]);
+  item('a coffer of aurei', 900, 5, 0.75, -16.2, [
+    [new THREE.BoxGeometry(0.5, 0.22, 0.34).translate(0, 0.11, 0), mats.timber], [new THREE.BoxGeometry(0.52, 0.04, 0.36).translate(0, 0.12, 0), mats.iron],
+    [new THREE.SphereGeometry(0.2, 10, 6).scale(1.05, 0.35, 0.7).translate(0, 0.22, 0), G],
+  ]);
+  {
+    const parts = [[new THREE.CylinderGeometry(0.115, 0.115, 0.07, 20, 1, true).translate(0, 0.035, 0), G], [new THREE.TorusGeometry(0.115, 0.014, 6, 20).rotateX(HP), G]];
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2, x = Math.sin(a) * 0.115, z = Math.cos(a) * 0.115;
+      parts.push([new THREE.ConeGeometry(0.022, 0.09, 6).translate(x, 0.115, z), G]);
+      parts.push([new THREE.SphereGeometry(0.017, 6, 5).translate(x * 1.06, 0.035, z * 1.06), [ruby, sapphire, emerald][i % 3]]);
+    }
+    parts.push([new THREE.SphereGeometry(0.1, 12, 8).scale(1, 0.55, 1).translate(0, 0.07, 0), new THREE.MeshStandardMaterial({ color: 0x6a0f1c, roughness: 0.9 })]);
+    // orb and sceptre beside the crown
+    parts.push([new THREE.SphereGeometry(0.075, 14, 10).translate(0.3, 0.075, 0.05), G], [new THREE.BoxGeometry(0.016, 0.09, 0.016).translate(0.3, 0.19, 0.05), G], [new THREE.BoxGeometry(0.06, 0.016, 0.016).translate(0.3, 0.2, 0.05), G]);
+    parts.push([new THREE.CylinderGeometry(0.012, 0.012, 0.55, 6).rotateZ(HP).translate(-0.05, 0.02, 0.3), G], [new THREE.SphereGeometry(0.035, 8, 6).translate(0.24, 0.02, 0.3), sapphire]);
+    item('the Crown Jewels', 12000, 0, 1.1, -15.6, parts, { jewels: true });
+  }
+
+  // ---- torchlight in the rooms (no shadows) ----
+  for (const p of torches) { const l = new THREE.PointLight(0xffa35c, 42, 20, 1.8); l.position.copy(p); group.add(l); }
+
+  return { group, colliders, solids, doors, loot, smoke, keep: { x: KX, z: KZ, top: kTop, half: KW / 2 }, gateTop: gTop };
 }
