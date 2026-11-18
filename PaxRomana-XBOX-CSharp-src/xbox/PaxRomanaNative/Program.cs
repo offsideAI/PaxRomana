@@ -1,20 +1,87 @@
 // Entry point of the Xbox (UWP) app. MonoGame creates the window and runs the game loop; everything else is the
 // shared game code under Game/.
 using System;
+using System.Diagnostics;
+using System.IO;
+using System.Threading.Tasks;
 using Windows.ApplicationModel.Core;
 using Windows.Graphics.Display;
+using Windows.Storage;
 using Windows.System.Profile;
 using Windows.UI.Core;
 using Windows.UI.ViewManagement;
 
 namespace PaxRomanaNative
 {
+    // A diary of the launch, written to startup.log in the app's local data folder, where the Xbox Device Portal can
+    // read it (scripts/xbox-diagnose.sh fetches it). If the game stops before it can draw its own error screen, this
+    // file says how far it got and why it stopped. It is rewritten on every launch.
+    static class StartupLog
+    {
+        static readonly object gate = new object();
+        static readonly Stopwatch clock = Stopwatch.StartNew();
+        static string path;
+
+        public static void Begin()
+        {
+            try
+            {
+                path = Path.Combine(ApplicationData.Current.LocalFolder.Path, "startup.log");
+                File.WriteAllText(path, "");
+            }
+            catch (Exception) { path = null; }
+            string where = "?", version = "?";
+            try { where = AnalyticsInfo.VersionInfo.DeviceFamily; } catch (Exception) { }
+            try
+            {
+                ulong v = ulong.Parse(AnalyticsInfo.VersionInfo.DeviceFamilyVersion);
+                version = (v >> 48) + "." + ((v >> 32) & 0xFFFF) + "." + ((v >> 16) & 0xFFFF) + "." + (v & 0xFFFF);
+            }
+            catch (Exception) { }
+            Write("launch at " + DateTime.UtcNow.ToString("u") + " on " + where + " " + version);
+        }
+
+        public static void Write(string line)
+        {
+            if (path == null) return;
+            lock (gate)
+            {
+                try { File.AppendAllText(path, (clock.ElapsedMilliseconds / 1000.0).ToString("0.000") + "  " + line + "\r\n"); } catch (Exception) { }
+            }
+        }
+    }
+
     public static class Program
     {
         static void Main()
         {
-            var factory = new MonoGame.Framework.GameFrameworkViewSource<XboxGame>();
-            CoreApplication.Run(factory);
+            StartupLog.Begin();
+            PaxRomana.PaxGame.Log = StartupLog.Write;
+            // Whatever goes wrong outside the game's own error handling ends up in the diary before the app closes.
+            try
+            {
+                AppDomain.CurrentDomain.UnhandledException += (s, e) => StartupLog.Write("UNHANDLED: " + e.ExceptionObject);
+                TaskScheduler.UnobservedTaskException += (s, e) => StartupLog.Write("UNOBSERVED TASK ERROR: " + e.Exception);
+                CoreApplication.UnhandledErrorDetected += (s, e) =>
+                {
+                    try { e.UnhandledError.Propagate(); }
+                    catch (Exception ex) { StartupLog.Write("UNHANDLED (app model): " + ex); throw; }
+                };
+            }
+            catch (Exception e) { StartupLog.Write("could not attach the error handlers: " + e); }
+
+            try
+            {
+                var factory = new MonoGame.Framework.GameFrameworkViewSource<XboxGame>();
+                StartupLog.Write("starting the app view");
+                CoreApplication.Run(factory);
+                StartupLog.Write("the app view returned (normal exit)");
+            }
+            catch (Exception e)
+            {
+                StartupLog.Write("STOPPED: " + e);
+                throw;
+            }
         }
     }
 
@@ -34,15 +101,17 @@ namespace PaxRomanaNative
                 CoreWindow window = CoreWindow.GetForCurrentThread();
                 double scale = DisplayInformation.GetForCurrentView().RawPixelsPerViewPixel;
                 int w = (int)Math.Round(window.Bounds.Width * scale), h = (int)Math.Round(window.Bounds.Height * scale);
+                Log("window " + window.Bounds.Width + " x " + window.Bounds.Height + " at scale " + scale + " -> " + w + " x " + h);
                 if (w >= 640 && h >= 360)
                 {
                     Graphics.PreferredBackBufferWidth = w;
                     Graphics.PreferredBackBufferHeight = h;
                 }
             }
-            catch (Exception)
+            catch (Exception e)
             {
                 // Not fatal: MonoGame falls back to the size of the visible area.
+                Log("could not size the picture to the window: " + e.GetType().Name + " " + e.Message);
             }
         }
     }

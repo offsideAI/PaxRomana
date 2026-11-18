@@ -22,6 +22,7 @@ Commands run from `PaxRomana-XBOX-CSharp-src/` unless a `cd` says otherwise.
 | Install a newer build | `rm -rf package`, then `deploy.sh` again |
 | Change the intro narration | Edit the lines in `tools/makevoice.py`, then `ELEVENLABS_API_KEY=… python3 tools/makevoice.py` |
 | Check the voice-over is packaged | `cd desktop && dotnet run -c Release -- --voice-check` |
+| Find out why the app will not start on the console | From the repo root: `XBOX_IP=… XBOX_USER=… XBOX_PASS=… ./scripts/xbox-diagnose.sh` |
 
 ## What you need
 
@@ -174,6 +175,7 @@ control) is tabulated in the PRD, section 10.13.
 | The console still runs the old build | `./package` held the old one. `rm -rf package` and install again. |
 | The install is refused over an existing version | Each build is signed with a newly generated certificate. Uninstall the app in Dev Home, then install again. |
 | The game shows an error screen | Copy the text; it names the failing file and method. |
+| The console refuses to start the app (for example "Sorry, that didn't work", 0x80070002) | Run `scripts/xbox-diagnose.sh` from the repo root with the same three variables as `deploy.sh`. It only reads: the installed package, whether the process is running, crash dumps, and `startup.log`, the diary the game writes while it starts (how far it got and any error). Add `--launch` to have the console start the app first. |
 | Low frame rate on the console | Set the app type to *Game* in Dev Home. |
 
 More symptoms and causes are in the PRD, section 10.15.

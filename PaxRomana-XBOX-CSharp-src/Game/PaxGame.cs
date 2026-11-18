@@ -15,6 +15,10 @@ namespace PaxRomana
         protected readonly GraphicsDeviceManager Graphics;
         protected World World; protected GameSim Sim;
         protected Renderer Renderer; HudRenderer hudRenderer;
+        // Start-up diary. The Xbox app points this at a file the Device Portal can read, so a launch that fails before
+        // anything can be drawn still leaves a record of how far it got. A no-op everywhere else.
+        public static Action<string> Log = s => { };
+        bool loggedUpdate, loggedDraw;
         public bool IsConsole;                  // true on Xbox: controller prompts from the start, no mouse, no quitting to desktop
         public bool Mute;
         readonly Pad pad = new Pad(); readonly KeyMouse km = new KeyMouse();
@@ -39,19 +43,41 @@ namespace PaxRomana
             Graphics.SynchronizeWithVerticalRetrace = true;
             Graphics.PreferredDepthStencilFormat = DepthFormat.Depth24;
             IsFixedTimeStep = false;
+            Log("game constructed");
+        }
+
+        protected override void Initialize()
+        {
+            Log("initialize: graphics device " + (GraphicsDevice == null ? "missing" : GraphicsDevice.PresentationParameters.BackBufferWidth + " x " + GraphicsDevice.PresentationParameters.BackBufferHeight + ", " + GraphicsDevice.GraphicsProfile));
+            base.Initialize();          // calls LoadContent
+            Log("initialized");
         }
 
         protected override void LoadContent()
         {
-            Renderer = new Renderer(GraphicsDevice);
-            hudRenderer = new HudRenderer(GraphicsDevice, Renderer);
-            blit = new SpriteBatch(GraphicsDevice);
+            Log("load content");
+            try
+            {
+                Renderer = new Renderer(GraphicsDevice);
+                Log("renderer ready");
+                hudRenderer = new HudRenderer(GraphicsDevice, Renderer);
+                Log("fonts ready");
+                blit = new SpriteBatch(GraphicsDevice);
+            }
+            catch (Exception e) { Fail(e); return; }
             bool wantSound = !Mute;
             loader = Task.Run(() =>
             {
                 Loaded l = new Loaded();
+                Log("loader: building the world");
                 l.World = World.Build((p, text) => { loadP = p; loadText = text; });
-                if (wantSound) { l.Pcm = Synth.RenderAll(); l.Voice = ReadVoice(); }
+                Log("loader: world built");
+                if (wantSound)
+                {
+                    l.Pcm = Synth.RenderAll(); l.Voice = ReadVoice();
+                    int found = 0; foreach (byte[] v in l.Voice) if (v != null) found++;
+                    Log("loader: sound synthesised, " + found + " of " + l.Voice.Length + " voice-over clips found");
+                }
                 return l;
             });
         }
@@ -183,12 +209,14 @@ namespace PaxRomana
         {
             if (fatal != null) return;
             string s = e.ToString();
+            Log("FAILED: " + s);
             fatal = s.Length > 1100 ? s.Substring(0, 1100) : s;
             try { StopRumble(); } catch (Exception) { }
         }
 
         protected override void Update(GameTime gameTime)
         {
+            if (!loggedUpdate) { loggedUpdate = true; Log("first update"); }
             if (fatal == null)
             {
                 try { Step(gameTime); } catch (Exception e) { Fail(e); }
@@ -221,9 +249,11 @@ namespace PaxRomana
                         Loaded l = loader.Result; loader = null;
                         World = l.World;
                         Renderer.SetWorld(World);
+                        Log("world uploaded to the graphics device");
                         if (l.Pcm != null)
                         {
-                            try { synth = new SynthAudio(l.Pcm); if (l.Voice != null) synth.SetVoice(l.Voice); audio = synth; } catch (Exception) { audio = new NullAudio(); }      // no audio device: play silently
+                            try { synth = new SynthAudio(l.Pcm); if (l.Voice != null) synth.SetVoice(l.Voice); audio = synth; Log("audio ready"); }
+                            catch (Exception e) { audio = new NullAudio(); Log("no audio, playing silently: " + e); }
                         }
                         NewMission();
                     }
@@ -257,6 +287,7 @@ namespace PaxRomana
 
         protected override void Draw(GameTime gameTime)
         {
+            if (!loggedDraw) { loggedDraw = true; Log("first draw"); }
             if (fatal == null)
             {
                 try { Paint(); } catch (Exception e) { Fail(e); }
@@ -267,7 +298,7 @@ namespace PaxRomana
                 {
                     GraphicsDevice.SetRenderTarget(Output);
                     GraphicsDevice.Clear(new Color(9, 11, 18));
-                    hudRenderer.DrawError(fatal);
+                    if (hudRenderer != null) hudRenderer.DrawError(fatal);
                 }
                 catch (Exception) { }
             }
