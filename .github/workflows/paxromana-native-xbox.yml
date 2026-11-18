@@ -1,0 +1,33 @@
+# Builds the Xbox (UWP, x64) package of Pax Romana: Tertia Roma, native C# edition, on a Windows runner.
+# Download the "paxromana-native-xbox-package" artifact and install it on a Dev Mode console
+# (see PaxRomana-XBOX-CSharp-src/README.md).
+name: Pax Romana native Xbox package
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'PaxRomana-XBOX-CSharp-src/**'
+      - '.github/workflows/paxromana-native-xbox.yml'
+
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      # The game rules, run headless: controller input, haptics, ballistics, breaching and the capture.
+      - name: Rules test
+        shell: powershell
+        run: dotnet run -c Release --project PaxRomana-XBOX-CSharp-src\tests\PaxRomana.Tests.csproj
+
+      # Signs with a throwaway certificate and runs MSBuild (.NET Native, x64).
+      - name: Build package
+        shell: powershell
+        run: .\PaxRomana-XBOX-CSharp-src\build.ps1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: paxromana-native-xbox-package
+          path: PaxRomana-XBOX-CSharp-src/package
+          if-no-files-found: error

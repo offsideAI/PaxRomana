@@ -54,3 +54,10 @@ PaxRomana-XBOX-src/xbox/**/AppPackages/
 PaxRomana-XBOX-src/xbox/**/BundleArtifacts/
 PaxRomana-XBOX-src/xbox/PaxRomanaXbox/web/
 PaxRomana-XBOX-src/package/
+
+# Pax Romana native C# (Xbox + desktop): build output and downloaded packages
+PaxRomana-XBOX-CSharp-src/**/bin/
+PaxRomana-XBOX-CSharp-src/**/obj/
+PaxRomana-XBOX-CSharp-src/**/AppPackages/
+PaxRomana-XBOX-CSharp-src/**/BundleArtifacts/
+PaxRomana-XBOX-CSharp-src/package/

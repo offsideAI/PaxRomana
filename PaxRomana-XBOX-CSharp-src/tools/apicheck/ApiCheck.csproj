@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Compile-only check: builds the shared game code against .NET Standard 2.0 and C# 7.3, the surface the Xbox (UWP)
+       build is limited to, so API or syntax the console build cannot use is caught on any machine:
+         dotnet build tools/apicheck -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>7.3</LangVersion>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AssemblyName>PaxRomana.ApiCheck</AssemblyName>
+    <RootNamespace>PaxRomana</RootNamespace>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\..\Game\**\*.cs" LinkBase="Game" />
+    <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.0.1641" />
+  </ItemGroup>
+</Project>
