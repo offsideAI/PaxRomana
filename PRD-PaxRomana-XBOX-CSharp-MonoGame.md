@@ -7,7 +7,7 @@
 | Platform | Xbox in Developer Mode (UWP, x64); also runs on macOS, Windows and Linux as a desktop build |
 | Technology | C# 7.3, MonoGame 3.8.1.303, no web view, no JavaScript, no asset files |
 | Document date | 2026-11-18 |
-| Status | Implemented and committed (3575a97). Rules tested and rendering checked on a Mac. **Nothing has run on the console yet**, and the first Xbox package build had started but not finished when this was written (see [section 9](#9-status-and-acceptance)). |
+| Status | Implemented and committed (3575a97). Rules tested and rendering checked on a Mac. The Xbox package builds on GitHub Actions. **Nothing has been installed or run on the console yet** (see [section 9](#9-status-and-acceptance)). |
 
 This document has two parts. Sections 1 to 9 are the product requirements: what the game is and how it must behave.
 Section 10 onwards is the developer documentation: how the code is organised and how to build, test, install and
@@ -368,14 +368,13 @@ workflow that runs the test before it builds the package.
 | Headless rules test (`tests/`), 46 checks | Passes. Last run 2026-11-18. Earlier in development it passed 52 consecutive runs after the last rule fix. |
 | Shared code compiles against .NET Standard 2.0 and C# 7.3 (`tools/apicheck`) | Passes |
 | Shared code compiles against the real `MonoGame.Framework.WindowsUniversal` 3.8.1.303 assembly | Passed, in a scratch project on the Mac |
+| GitHub Actions workflow: rules test on Windows, UWP project and `Program.cs` compile with .NET Native, package signed and uploaded | Passed on the first run, 2026-11-18 (run 44402866842, commit 3575a97) |
 | Rendering on the desktop build | 18 scripted views inspected on a Mac: title, nest, low sun, scope, 16× on a guard, kill-cam in flight and on impact, gate breach, courtyard, explosion, smoke, camp and skyline, controls overlay, end screen; and the error screen |
 
 ### Not verified
 
 | Item | Why |
 | --- | --- |
-| `xbox/PaxRomanaNative/PaxRomanaNative.csproj` and `Program.cs` compile | Needs Windows and the UWP workload; the first GitHub Actions run decides this |
-| The GitHub Actions workflow | First run started 2026-11-18 (run 44402866842); result not known when this was written |
 | The game on the console: start-up, frame rate, resolution, safe area | Nothing has been installed yet |
 | Vibration on a real controller, including the trigger motors | Tested only as numbers sent to the controller layer |
 | How the sound actually sounds | The test checks only that every clip is generated, audible and not clipped |
@@ -383,7 +382,7 @@ workflow that runs the test before it builds the package.
 
 ### Acceptance criteria for the console
 
-1. The workflow completes and produces the `paxromana-native-xbox-package` artifact.
+1. The workflow completes and produces the `paxromana-native-xbox-package` artifact. **Met on 2026-11-18.**
 2. `deploy.sh` installs it and "Pax Romana: Tertia Roma (Native)" appears in Dev Home.
 3. The game starts to the title panel with no WebView2 message, finishes loading, and **A** starts the mission.
 4. The picture fills the screen and no HUD text is cut off at the edges.
@@ -737,7 +736,7 @@ APIs that compile on .NET 8 but not for the console, which would otherwise surfa
 | Symptom | Likely cause and action |
 | --- | --- |
 | The workflow fails in "Rules test" | A rule regression. Run `cd tests && dotnet run -c Release` locally; the failing line says which check. |
-| The workflow fails in "Build package" | The UWP project has never been compiled, so the first run may need fixes to the project file or `Program.cs`. `gh run view --log-failed` shows the MSBuild error. |
+| The workflow fails in "Build package" | `gh run view --log-failed` shows the MSBuild error. The usual cause is C# or an API the UWP toolchain lacks; `dotnet build tools/apicheck` reproduces most of those locally. |
 | `deploy.sh` says no package found | The artifact did not download or `./package` holds an old build. Delete `./package` and run it again. |
 | Installing over an existing version is refused | Each CI build is signed with a newly generated certificate. Uninstall the app in Dev Home and install again. |
 | The game shows its error screen | The text is the exception. It usually names the file and method. |
