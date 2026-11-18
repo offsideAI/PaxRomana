@@ -46,3 +46,11 @@ WSBX-src/package/
 .vs/
 *.csproj.user
 *.pfx
+
+# Pax Romana Xbox app: build output, bundled web build, downloaded packages
+PaxRomana-XBOX-src/xbox/**/bin/
+PaxRomana-XBOX-src/xbox/**/obj/
+PaxRomana-XBOX-src/xbox/**/AppPackages/
+PaxRomana-XBOX-src/xbox/**/BundleArtifacts/
+PaxRomana-XBOX-src/xbox/PaxRomanaXbox/web/
+PaxRomana-XBOX-src/package/

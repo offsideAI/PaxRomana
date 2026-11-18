@@ -1,0 +1,31 @@
+# Builds the Xbox (UWP, x64) package of Pax Romana: Tertia Roma on a Windows runner.
+# Download the "paxromana-xbox-package" artifact and install it on a Dev Mode console (see PaxRomana-XBOX-src/README.md).
+name: Pax Romana Xbox package
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'PaxRomana-XBOX-src/**'
+      - '.github/workflows/paxromana-xbox.yml'
+
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Builds the web game, copies it into the app project, signs with a throwaway certificate and runs MSBuild.
+      - name: Build package
+        shell: powershell
+        run: .\PaxRomana-XBOX-src\build.ps1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: paxromana-xbox-package
+          path: PaxRomana-XBOX-src/package
+          if-no-files-found: error
