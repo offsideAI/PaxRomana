@@ -58,7 +58,8 @@ namespace PaxRomana
     }
 
     // The intro that plays once before the first mission: it names the level and gives the briefing over a flight
-    // across the valley. Each card is shown from Start to End (seconds); a line may carry <b> and <em> runs.
+    // across the valley, narrated by the voice-over in assets/voice. A card stays up for as long as its narration
+    // runs, so the timings come from the clip lengths in IntroVoice. A line may carry <b> and <em> runs.
     public sealed class IntroCard
     {
         public float Start, End; public string Kicker, Title, Sub; public string[] Lines;
@@ -66,15 +67,34 @@ namespace PaxRomana
 
     public static class IntroScript
     {
-        public const float Length = 27;
+        const float LEAD = 0.8f, GAP = 0.6f, TAIL = 0.9f;
+        public const float VoiceDelay = 0.3f;         // the narration starts this long after its card appears
         public static readonly IntroCard[] Cards =
         {
-            new IntroCard { Start = 0.6f, End = 6.4f, Kicker = "RESEARCH AND ANALYSIS WING · FIELD DOSSIER", Title = "LEVEL ZERO", Sub = "THE KEYS" },
-            new IntroCard { Start = 7.0f, End = 13.2f, Kicker = "BAVARIA · SUMMER 1944", Lines = new[] { "Beyond this valley the Reich is enriching <b>uranium-235</b>.", "The works are walled, wired and watched. No one walks in." } },
-            new IntroCard { Start = 13.8f, End = 20.0f, Kicker = "BURG ADLERSTEIN", Lines = new[] { "The <b>keys to the enrichment zone</b> lie in a strongbox", "in the vault of the castle keep, behind a garrison of twenty-nine." } },
-            new IntroCard { Start = 20.6f, End = 26.4f, Kicker = "YOUR ORDERS, AGENT", Lines = new[] { "Clear the castle and <b>take the keys</b>.", "<em>Level One: enter the zone, and break it from the inside.</em>" } },
+            new IntroCard { Kicker = "RESEARCH AND ANALYSIS WING · FIELD DOSSIER", Title = "LEVEL ZERO", Sub = "THE KEYS" },
+            new IntroCard { Kicker = "BAVARIA · SUMMER 1944", Lines = new[] { "Beyond this valley the Reich is enriching <b>uranium-235</b>.", "The works are walled, wired and watched. No one walks in." } },
+            new IntroCard { Kicker = "BURG ADLERSTEIN", Lines = new[] { "The <b>keys to the enrichment zone</b> lie in a strongbox", "in the vault of the castle keep, behind a garrison of twenty-nine." } },
+            new IntroCard { Kicker = "YOUR ORDERS, AGENT", Lines = new[] { "Clear the castle and <b>take the keys</b>.", "<em>Level One: enter the zone, and break it from the inside.</em>" } },
         };
-        public static IntroCard At(float t) { foreach (IntroCard c in Cards) if (t >= c.Start && t < c.End) return c; return null; }
+        public static readonly float Length;          // seconds
+        public static readonly float[] Cuts;          // the camera shot behind card i runs from Cuts[i] to Cuts[i + 1]
+
+        static IntroScript()
+        {
+            Cuts = new float[Cards.Length + 1];
+            float t = LEAD;
+            for (int i = 0; i < Cards.Length; i++)
+            {
+                float speech = i < IntroVoice.Seconds.Length ? IntroVoice.Seconds[i] : 4;
+                Cards[i].Start = t; Cards[i].End = t + VoiceDelay + speech + TAIL;
+                Cuts[i] = i == 0 ? 0 : t - GAP / 2;
+                t = Cards[i].End + GAP;
+            }
+            Length = t; Cuts[Cards.Length] = t;
+        }
+
+        public static int IndexAt(float t) { for (int i = 0; i < Cards.Length; i++) if (t >= Cards[i].Start && t < Cards[i].End) return i; return -1; }
+        public static IntroCard At(float t) { int i = IndexAt(t); return i < 0 ? null : Cards[i]; }
     }
 
     // Taking the keys: doors (opened by hand or blown in), the count of defenders still inside the walls, and the

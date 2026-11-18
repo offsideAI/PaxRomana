@@ -31,15 +31,45 @@ rules correctly but may use the old names.
 | The player: a nameless sniper with a Gauss rifle | An agent of the Research and Analysis Wing with a scoped bolt-action rifle |
 | Objective: clear the walls, hold the courtyard flagpole for 8 s | Objective: clear the walls, enter the keep, open the vault, stand at the strongbox for 8 s to take the keys to the enrichment zone |
 | Doors: Spasskaya gate, Arsenal, cathedral, Senate, command vault | Doors: castle gate, armoury, chapel, keep, vault |
-| Starts straight from the title panel | A 27-second intro plays first, once per session: a "LEVEL ZERO · THE KEYS" title card and three briefing cards over a flight across the valley, the works and the castle. **A**, Menu or RT (Enter, Space, Esc or a click) skips it. |
+| Starts straight from the title panel | A 40-second narrated intro plays first, once per session: a "LEVEL ZERO · THE KEYS" title card and three briefing cards over a flight across the valley, the works and the castle. **A**, Menu or RT (Enter, Space, Esc or a click) skips it. |
 | End screen "THE KREMLIN IS YOURS", Latin ratings | "LEVEL ZERO COMPLETE · THE KEYS ARE YOURS", with a line pointing to Level One; ratings Chhaya, Nishanebaaz, Rangroot |
 | Parity with the web edition in setting and objective | The web edition is unchanged, so the two now differ in setting and objective. Rules, controls and haptics still match. |
 
 Unchanged: the map layout and coordinates, the 29 posts and patrol routes, alert rules, ballistics, kill-cam,
 explosive charges, door mechanics, controls, haptics, sound, architecture, build and deployment. The rules test now
-has 58 checks, including the intro (skipped, and played through) and the walk through the keep into the vault.
+has 67 checks, including the intro (skipped, and played through), the walk through the keep into the vault, and the
+voice-over clips.
 
 Later levels (infiltrating and subverting the enrichment zone) are not designed or built.
+
+### Voice-over (added 2026-11-18)
+
+The intro is narrated. Four clips, one per card, were generated with ElevenLabs text-to-speech in the premade voice
+"Brian" and are stored in `PaxRomana-XBOX-CSharp-src/assets/voice/` (16-bit mono WAVE, 24 kHz, 32.4 s and about
+1.5 MB in all). The narration follows the card text:
+
+1. "Research and Analysis Wing. Field dossier. Level Zero: The Keys."
+2. "Bavaria. Summer, nineteen forty-four. Beyond this valley, the Reich is enriching uranium two thirty-five. The
+   works are walled, wired and watched. No one walks in."
+3. "Burg Adlerstein. The keys to the enrichment zone lie in a strongbox, in the vault of the castle keep, behind a
+   garrison of twenty-nine."
+4. "Your orders, agent. Clear the castle, and take the keys. Level One: enter the zone, and break it from the
+   inside."
+
+- Each clip starts 0.3 s after its card appears, and the card stays up until 0.9 s after the clip ends, so the
+  intro's length (40.4 s) follows from the clip lengths. They are recorded in the generated file
+  `Game/IntroVoice.g.cs`.
+- Skipping the intro, or leaving the app during it, stops the narration.
+- A missing or unreadable clip is not an error: that card plays silently.
+- **These are the first files the game loads at run time**, which supersedes the "no asset files" statements in
+  sections 3, 6 and 10. Sound effects, textures, geometry and fonts are still generated in code.
+- `tools/makevoice.py` regenerates the clips and the timing file from the narration lines it contains. It reads the
+  API key from the environment and stores it nowhere.
+- New code: `Wav` (a small WAVE reader) and `SynthAudio.SetVoice / Voice / StopVoice` in `Audio.cs`; `IAudio.Voice`
+  and `StopVoice`; `PaxGame.ReadVoice` (reads the files through MonoGame's `TitleContainer`); both project files
+  include `assets/**/*.wav` as content.
+- Not verified: how the narration sounds in the game (it has not been listened to; a transcription of the clips
+  matched the script), and that the Xbox package includes and plays the clips.
 
 ## 1. Summary
 
@@ -105,7 +135,7 @@ data collection: the app manifest declares no capabilities.
 | Stage | Objective text | Condition |
 | --- | --- | --- |
 | Title | Menu panel over a slow camera drift above the valley | Until **A** (or Enter / click) once loading has finished |
-| Intro | Title card "LEVEL ZERO · THE KEYS", then three briefing cards, letterboxed, over a scripted flight | First start of a session only. 27 s, or until skipped. The mission clock does not run. |
+| Intro | Title card "LEVEL ZERO · THE KEYS", then three briefing cards, letterboxed, over a scripted flight, narrated | First start of a session only. About 40 s, or until skipped. The mission clock does not run. |
 | 0 | Breach the castle: open the gate, or blow it in | Defenders alive inside the walls, player outside |
 | 1 | Clear the defenders inside the walls: *n* left | Defenders alive inside the walls, player inside |
 | 2 | Take the keys from the vault in the keep | No defenders inside the walls, player away from the strongbox |
@@ -396,7 +426,7 @@ workflow that runs the test before it builds the package.
 
 | Check | Result |
 | --- | --- |
-| Headless rules test (`tests/`), 58 checks | Passes. Last run 2026-11-18 after the Level Zero re-theme, eight times in a row. |
+| Headless rules test (`tests/`), 67 checks | Passes. Last run 2026-11-18 after the voice-over was added. |
 | Shared code compiles against .NET Standard 2.0 and C# 7.3 (`tools/apicheck`) | Passes |
 | Shared code compiles against the real `MonoGame.Framework.WindowsUniversal` 3.8.1.303 assembly | Passed, in a scratch project on the Mac |
 | GitHub Actions workflow: rules test on Windows, UWP project and `Program.cs` compile with .NET Native, package signed and uploaded | Passed on the first run, 2026-11-18 (run 44402866842, commit 3575a97). That was the build before the Level Zero re-theme; the re-themed code has not been through the workflow yet. |

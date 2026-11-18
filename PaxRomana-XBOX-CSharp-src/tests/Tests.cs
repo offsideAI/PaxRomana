@@ -70,8 +70,10 @@ namespace PaxRomana
             IntroCard card = IntroScript.At(sim.Hud.IntroT);
             Check(card != null && card.Title == "LEVEL ZERO", "two seconds in, the title card reads \"" + (card == null ? "" : card.Title + ": " + card.Sub) + "\"");
             Check(!sim.Player.Enabled && sim.Time == 0, "the mission clock does not run during the intro");
+            Check(audio.Voices == 1 && audio.LastVoice == 0, "the narration for the title card has started");
             Press(Btn.A);
             Check(!sim.Intro && !sim.Hud.IntroOn && !sim.Hud.Cine, "A skips the intro");
+            Check(audio.VoiceStops >= 1, "skipping stops the narration");
             Check(sim.Started && sim.Player.Enabled && !sim.Hud.MenuVisible && sim.Hud.IsPad, "the mission starts, with controller prompts");
             Vector3 p0 = sim.Player.Pos; float yaw0 = sim.Player.Yaw;
             axes[1] = -1; Tick(60); Release();
@@ -167,9 +169,10 @@ namespace PaxRomana
             sim.Hud.SetReady();
             Check(!gateDoor.Broken && !gateDoor.Solid.Off && !sim.Capture.Done, "a new mission restores the gate and the strongbox");
             Tick(); Press(Btn.A);
-            int introFrames = 0; bool sawOrders = false;
-            while (sim.Intro && introFrames++ < 60 * 40) { Tick(); IntroCard c2 = IntroScript.At(sim.Hud.IntroT); if (c2 != null && c2.Kicker == "YOUR ORDERS, AGENT") sawOrders = true; }
+            int introFrames = 0, voicesBefore = audio.Voices; bool sawOrders = false;
+            while (sim.Intro && introFrames++ < 60 * 120) { Tick(); IntroCard c2 = IntroScript.At(sim.Hud.IntroT); if (c2 != null && c2.Kicker == "YOUR ORDERS, AGENT") sawOrders = true; }
             Check(!sim.Intro && sim.Started && sawOrders, "left alone, the intro plays its briefing and ends by itself after " + (introFrames * DT).ToString("0.0") + " s");
+            Check(audio.Voices - voicesBefore == IntroScript.Cards.Length && audio.LastVoice == IntroScript.Cards.Length - 1, "each of the " + IntroScript.Cards.Length + " cards starts its narration, in order");
             sim.SetPlaying(false); Press(Btn.A);
             Check(!sim.Intro && sim.Player.Enabled, "resuming from pause does not replay the intro");
             // a kill-cam left to play out, from the nest, before any sentry has been disturbed
@@ -212,6 +215,27 @@ namespace PaxRomana
             Check(pcm.Count == 19 && silentClips.Length == 0, "every clip has sound in it" + (silentClips.Length > 0 ? " (silent: " + silentClips + ")" : ""));
             Check(clippedClips.Length == 0, "no clip is driven into clipping" + (clippedClips.Length > 0 ? " (" + clippedClips + ")" : ""));
             Check(seconds < 60, "about " + seconds.ToString("0") + " s of audio in memory");
+
+            Console.WriteLine("7. Intro voice-over");
+            string dir = AppContext.BaseDirectory, voiceDir = null;
+            for (int up = 0; up < 8 && dir != null && voiceDir == null; up++)
+            {
+                string candidate = System.IO.Path.Combine(dir, "assets", "voice");
+                if (System.IO.Directory.Exists(candidate)) voiceDir = candidate; else dir = System.IO.Path.GetDirectoryName(dir.TrimEnd(System.IO.Path.DirectorySeparatorChar));
+            }
+            Check(voiceDir != null && IntroVoice.Files.Length == IntroScript.Cards.Length, "assets/voice is there, with one clip listed per intro card");
+            if (voiceDir != null)
+                for (int i = 0; i < IntroVoice.Files.Length; i++)
+                {
+                    string path = System.IO.Path.Combine(voiceDir, IntroVoice.Files[i]);
+                    Wav w = System.IO.File.Exists(path) ? Wav.Parse(System.IO.File.ReadAllBytes(path)) : null;
+                    int top = 0;
+                    if (w != null) for (int k = 0; k + 1 < w.Pcm.Length; k += 2) top = Math.Max(top, Math.Abs((int)BitConverter.ToInt16(w.Pcm, k)));
+                    IntroCard ic = IntroScript.Cards[i];
+                    Check(w != null && w.Channels == 1 && top > 8000 && Math.Abs(w.Seconds - IntroVoice.Seconds[i]) < 0.05f && ic.End - ic.Start > w.Seconds,
+                        IntroVoice.Files[i] + (w == null ? " is missing or not 16-bit PCM" : ": " + w.Seconds.ToString("0.00") + " s at " + w.Rate + " Hz, fits its card (" + (ic.End - ic.Start).ToString("0.0") + " s)"));
+                }
+            Check(Wav.Parse(new byte[60]) == null && Wav.Parse(null) == null, "a file that is not a WAVE file is rejected, not played");
 
             Console.WriteLine(failures == 0 ? "ALL CHECKS PASSED" : failures + " CHECK(S) FAILED");
             return failures == 0 ? 0 : 1;

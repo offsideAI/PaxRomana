@@ -46,6 +46,7 @@ namespace PaxRomana
         public bool ShowIntro = true;        // play the Level Zero intro before the first mission of a session
         public bool Intro;                   // the intro is playing
         public float IntroT;
+        int introVoiced = -1;                // the last intro card whose narration was started
         public float Time, GameTime, Clock; public int Alarms;
         float endT = -1, timeScale = 1, range, rangeT, edgeT, spotT, hintDelay = -1, titleT;
         bool ltHeld, rtHeld, spotted;
@@ -313,40 +314,37 @@ namespace PaxRomana
         // ---- the Level Zero intro: title and briefing cards over a flight across the valley ----
         void StartIntro()
         {
-            Intro = true; IntroT = 0; ShowIntro = false;
+            Intro = true; IntroT = 0; ShowIntro = false; introVoiced = -1;
             Hud.ShowMenu(false, false); Hud.Cine = true; Hud.IntroOn = true; Hud.IntroT = 0;
         }
         public void EndIntro()
         {
             if (!Intro) return;
             Intro = false; Hud.Cine = false; Hud.IntroOn = false;
+            Audio.StopVoice();
             Begin(padMode);
         }
 
-        // Camera path of the intro: position and target at a handful of moments, eased between them.
-        static readonly float[][] IntroPath =
+        // Camera shots of the intro, one per card: where the camera starts and what it looks at, then where it ends
+        // and what it looks at. Each shot lasts as long as its card (IntroScript.Cuts).
+        static readonly float[][] IntroShots =
         {
-            //        t      camera x, y, z          looks at x, y, z
-            new[] {  0f,     150, 96, 470,            0, 44, 0 },                                          // from behind the ridge, the castle across the valley
-            new[] {  6.6f,   110, 78, 300,            0, 46, 0 },
-            new[] {  7.0f,   -60, 120, 110,           Config.WORKS_X, 30, Config.WORKS_Z },                // over the castle towards the works
-            new[] { 13.4f,   120, 105, -160,          Config.WORKS_X, 34, Config.WORKS_Z },
-            new[] { 13.8f,   72, 74, 84,              0, 50, -8 },                                         // round the keep
-            new[] { 20.2f,   -68, 70, 78,             0, 48, -8 },
-            new[] { 20.6f,   Config.SPAWN_X + 22, 88, Config.SPAWN_Z + 30,   0, 40, 0 },                    // back to the nest
-            new[] { 27f,     Config.SPAWN_X, 79, Config.SPAWN_Z + 2,         0, 40, 0 },
+            //      from x, y, z          looks at            to x, y, z            looks at
+            new[] { 150f, 96, 470,        0, 44, 0,           110, 78, 300,         0, 46, 0 },                                             // from behind the ridge, the castle across the valley
+            new[] { -60f, 120, 110,       Config.WORKS_X, 30, Config.WORKS_Z,       120, 105, -160,   Config.WORKS_X, 34, Config.WORKS_Z },   // over the castle towards the works
+            new[] { 72f, 74, 84,          0, 50, -8,          -68, 70, 78,          0, 48, -8 },                                            // round the keep
+            new[] { Config.SPAWN_X - 6, 100, Config.SPAWN_Z + 40,   0, 40, 0,       Config.SPAWN_X, 79, Config.SPAWN_Z + 2,   0, 40, 0 },    // down to the nest, between its trees
         };
 
         void SetIntroCamera()
         {
-            float t = Math.Min(IntroT, IntroScript.Length);
+            float[] cuts = IntroScript.Cuts;
             int i = 0;
-            while (i < IntroPath.Length - 2 && t >= IntroPath[i + 1][0]) i++;
-            float[] a = IntroPath[i], b = IntroPath[i + 1];
-            float k = M.Smoothstep(0, 1, (t - a[0]) / (b[0] - a[0]));
-            if (b[0] - a[0] < 1) k = k < 0.5f ? 0 : 1;          // a cut, not a move
-            Vector3 pos = Vector3.Lerp(new Vector3(a[1], a[2], a[3]), new Vector3(b[1], b[2], b[3]), k);
-            Vector3 look = Vector3.Lerp(new Vector3(a[4], a[5], a[6]), new Vector3(b[4], b[5], b[6]), k);
+            while (i < IntroShots.Length - 1 && IntroT >= cuts[i + 1]) i++;
+            float[] s = IntroShots[i];
+            float k = M.Smoothstep(0, 1, (IntroT - cuts[i]) / (cuts[i + 1] - cuts[i]));
+            Vector3 pos = Vector3.Lerp(new Vector3(s[0], s[1], s[2]), new Vector3(s[6], s[7], s[8]), k);
+            Vector3 look = Vector3.Lerp(new Vector3(s[3], s[4], s[5]), new Vector3(s[9], s[10], s[11]), k);
             pos.Y = Math.Max(pos.Y, Terrain.GroundAt(pos.X, pos.Z) + 3);
             Player.Cam.LookAt(pos, look);
             Player.Cam.Fov = 52; Player.Cam.Near = 0.5f;
@@ -469,7 +467,14 @@ namespace PaxRomana
                 if (Intro)
                 {
                     IntroT += dtReal; Hud.IntroT = IntroT;
-                    if (IntroT >= IntroScript.Length) EndIntro(); else SetIntroCamera();
+                    if (IntroT >= IntroScript.Length) EndIntro();
+                    else
+                    {
+                        SetIntroCamera();
+                        // the narration for a card starts a moment after the card appears
+                        int card = IntroScript.IndexAt(IntroT - IntroScript.VoiceDelay);
+                        if (card >= 0 && card != introVoiced) { introVoiced = card; Audio.Voice(card); }
+                    }
                 }
                 else
                 {

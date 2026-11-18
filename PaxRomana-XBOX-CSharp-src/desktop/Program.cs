@@ -4,6 +4,7 @@
 //     dotnet run -c Release -- --fullscreen                   play full screen
 //     dotnet run -c Release -- --console                      behave as on the Xbox: controller prompts, no mouse
 //     dotnet run -c Release -- --shots <folder>               render a fixed set of views to PNG files and exit (a visual check)
+//     dotnet run -c Release -- --voice-check                  load the intro voice-over as the game does, list it, and exit (plays nothing)
 using System;
 using System.IO;
 using Microsoft.Xna.Framework;
@@ -13,6 +14,23 @@ namespace PaxRomana
 {
     static class Program
     {
+        // Reads the voice-over files from where the program was built to, exactly as the game does, and makes a sound
+        // effect of each without playing it. Returns 0 if every clip loaded.
+        static int VoiceCheck()
+        {
+            byte[][] files = PaxGame.ReadVoice(); int bad = 0;
+            for (int i = 0; i < files.Length; i++)
+            {
+                Wav w = Wav.Parse(files[i]);
+                if (w == null) { Console.WriteLine(IntroVoice.Files[i] + ": " + (files[i] == null ? "not found" : "not a 16-bit PCM WAVE file")); bad++; continue; }
+                string made = "sound effect created";
+                try { using (Microsoft.Xna.Framework.Audio.SoundEffect fx = new Microsoft.Xna.Framework.Audio.SoundEffect(w.Pcm, w.Rate, Microsoft.Xna.Framework.Audio.AudioChannels.Mono)) made += " (" + fx.Duration.TotalSeconds.ToString("0.00") + " s)"; }
+                catch (Exception e) { made = "no sound effect: " + e.GetType().Name; bad++; }
+                Console.WriteLine(IntroVoice.Files[i] + ": " + files[i].Length + " bytes, " + w.Rate + " Hz, " + w.Seconds.ToString("0.00") + " s, " + made);
+            }
+            return bad == 0 ? 0 : 1;
+        }
+
         static void Main(string[] args)
         {
             string shots = null; bool full = false, mute = false, console = false;
@@ -22,6 +40,7 @@ namespace PaxRomana
                 else if (args[i] == "--fullscreen") full = true;
                 else if (args[i] == "--mute") mute = true;
                 else if (args[i] == "--console") console = true;
+                else if (args[i] == "--voice-check") { Environment.Exit(VoiceCheck()); }
             }
             using (DesktopGame game = new DesktopGame(shots, full))
             {
@@ -65,10 +84,10 @@ namespace PaxRomana
             switch (step)
             {
                 case 0: wait = 0.5f; break;                                                            // title screen
-                case 1: s.Begin(true); wait = 3.0f; break;                                              // intro: the Level Zero title card
-                case 2: wait = 7.0f; break;                                                            // ... the enrichment works
-                case 3: wait = 6.6f; break;                                                            // ... the keep
-                case 4: wait = 6.4f; break;                                                            // ... the orders
+                case 1: s.Begin(true); wait = Mid(0); break;                                            // intro: the Level Zero title card
+                case 2: wait = Mid(1) - Mid(0); break;                                                  // ... the enrichment works
+                case 3: wait = Mid(2) - Mid(1); break;                                                  // ... the keep
+                case 4: wait = Mid(3) - Mid(2); break;                                                  // ... the orders
                 case 5: s.EndIntro(); s.Hud.HintT = 0; wait = 0.67f; break;                             // the nest, rifle at the hip
                 case 6: Near(s.Garrison.Soldiers[24], 2.6f, 0.9f); wait = 0.3f; break;                  // a soldier by the camp fire, close up
                 case 7: Near(s.Garrison.Soldiers[16], 3.4f, -1.6f); wait = 0.3f; break;                 // the officer and his section
@@ -96,6 +115,8 @@ namespace PaxRomana
             }
             step++;
         }
+
+        static float Mid(int card) { return (IntroScript.Cards[card].Start + IntroScript.Cards[card].End) / 2; }      // the middle of an intro card
 
         void Aim(Vector3 target)
         {

@@ -109,13 +109,16 @@ namespace PaxRomana
     {
         void Shot(); void Bolt(float delay); void Reload(); void Dry(); void Impact(string kind, float delay, float dist); void Hit(bool head);
         void Horn(); void Heartbeat(); void Launch(); void Explosion(float delay, float dist); void Door(); void Loot(); void Step();
+        void Voice(int clip);       // start a voice-over clip (index into IntroVoice.Files), replacing any that is playing
+        void StopVoice();
     }
 
     public sealed class NullAudio : IAudio
     {
-        public int Shots, Explosions;
+        public int Shots, Explosions, Voices, VoiceStops, LastVoice = -1;
         public void Shot() { Shots++; } public void Bolt(float delay) { } public void Reload() { } public void Dry() { }
         public void Impact(string kind, float delay, float dist) { } public void Hit(bool head) { } public void Horn() { } public void Heartbeat() { }
         public void Launch() { } public void Explosion(float delay, float dist) { Explosions++; } public void Door() { } public void Loot() { } public void Step() { }
+        public void Voice(int clip) { Voices++; LastVoice = clip; } public void StopVoice() { VoiceStops++; }
     }
 }

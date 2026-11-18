@@ -11,7 +11,8 @@ castle walls, get into the keep, and **take the keys**. Later levels use them to
 subvert it from the inside.
 
 The level opens with an intro: a "Level Zero" title card and three briefing cards over a flight across the valley,
-the works and the castle. It plays once per session and **A** skips it.
+the works and the castle, narrated by a recorded voice-over. It runs for about 40 seconds, plays once per session,
+and **A** skips it.
 
 Your rifle fires sniper rounds and **explosive charges** (8 per mission). A charge flies the same trajectory as a
 bullet, kills everything within about 8 m of where it lands, and blows doors and the castle gate off their hinges.
@@ -81,12 +82,13 @@ All four motors of the Xbox controller are used, including the impulse motors in
 | `xbox/` | The Xbox (UWP) app: a project file, a manifest and a 50-line entry point around `Game/`. |
 | `desktop/` | The same game in a window on macOS, Windows or Linux. |
 | `tests/` | Headless test of the rules. |
-| `tools/` | The font baker (`makefont.py`), the two fonts it reads, and a compile-only check (`apicheck`). |
+| `assets/` | The only files the game loads at run time: the intro voice-over, `assets/voice/intro1.wav` to `intro4.wav`. |
+| `tools/` | The font baker (`makefont.py`) and the two fonts it reads, the voice-over generator (`makevoice.py`), and a compile-only check (`apicheck`). |
 | `build.ps1`, `deploy.sh` | Build the Xbox package on Windows; install it on the console from any machine. |
 
 `Game/` at a glance: `GameSim.cs` is one mission (rules, input, haptics) with no drawing in it; `Renderer.cs` and
 `HudRenderer.cs` draw it; `PaxGame.cs` is the window, the loading screen and the device input. Textures, geometry,
-fonts and sound are all generated at start-up: there are no asset files.
+fonts and sound effects are all generated at start-up; the intro voice-over is the one thing loaded from files.
 
 ## Try it on a Mac or PC
 
@@ -102,6 +104,7 @@ Options go after `--`:
     dotnet run -c Release -- --console        # behave as on the Xbox: controller prompts only
     dotnet run -c Release -- --mute
     dotnet run -c Release -- --shots out      # render a fixed set of views to out/*.png and quit
+    dotnet run -c Release -- --voice-check    # load the intro voice-over as the game does, list it and quit (plays nothing)
 
 ## Test the rules
 
@@ -143,6 +146,21 @@ For the smoothest frame rate, switch the app's type from *App* to *Game* in Dev 
 then *View details*): games get the whole GPU and more memory.
 
 If something goes wrong while it runs, the game shows the error text on screen instead of closing.
+
+## Voice-over
+
+The intro is narrated by four clips in `assets/voice/`, one per card, generated with
+[ElevenLabs](https://elevenlabs.io) text-to-speech (the premade voice "Brian"). They are ordinary 16-bit mono WAVE
+files at 24 kHz, about 1.5 MB in all. Both the Xbox package and the desktop build include them; if a clip is missing,
+that card plays without narration.
+
+The narration text is in `tools/makevoice.py`. To change it, edit the lines there and run:
+
+    ELEVENLABS_API_KEY=<your key> python3 tools/makevoice.py
+
+The script rewrites the clips and `Game/IntroVoice.g.cs`, which holds each clip's length. Those lengths time the
+intro: a card stays up for as long as its narration runs. Whether the clips may be distributed depends on the
+ElevenLabs plan of the account that generated them.
 
 ## Fonts
 

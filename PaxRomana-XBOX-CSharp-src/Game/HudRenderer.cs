@@ -400,7 +400,7 @@ namespace PaxRomana
             float t = hud.IntroT, cx = W / 2;
             // open on black, and dip to black at the cuts between shots
             float dark = 1 - M.Smoothstep(0.0f, 1.2f, t);
-            foreach (float cut in new[] { 6.8f, 13.6f, 20.4f }) dark = Math.Max(dark, 1 - M.Clamp(Math.Abs(t - cut) / 0.45f));
+            for (int i = 1; i < IntroScript.Cards.Length; i++) dark = Math.Max(dark, 1 - M.Clamp(Math.Abs(t - IntroScript.Cuts[i]) / 0.45f));
             dark = Math.Max(dark, M.Smoothstep(IntroScript.Length - 0.5f, IntroScript.Length, t));
             if (dark > 0.004f) Rect(0, 0, W, H, A(Color.Black, dark));
             IntroCard c = IntroScript.At(t);

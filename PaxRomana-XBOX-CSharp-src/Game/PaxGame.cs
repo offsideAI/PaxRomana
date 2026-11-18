@@ -21,7 +21,7 @@ namespace PaxRomana
         readonly Hud bootHud = new Hud();
         IAudio audio = new NullAudio(); SynthAudio synth;
         Task<Loaded> loader; volatile float loadP; volatile string loadText = "Preparing…";
-        sealed class Loaded { public World World; public Dictionary<string, short[]> Pcm; }
+        sealed class Loaded { public World World; public Dictionary<string, short[]> Pcm; public byte[][] Voice; }
         int padIndex = -1; readonly float[] axes = new float[4], buttons = new float[16], sent = new float[4];
         KeyboardState prevKeys; MouseState prevMouse; bool captured;
         protected RenderTarget2D Output;        // where the finished frame goes; null = the screen
@@ -51,9 +51,26 @@ namespace PaxRomana
             {
                 Loaded l = new Loaded();
                 l.World = World.Build((p, text) => { loadP = p; loadText = text; });
-                if (wantSound) l.Pcm = Synth.RenderAll();
+                if (wantSound) { l.Pcm = Synth.RenderAll(); l.Voice = ReadVoice(); }
                 return l;
             });
+        }
+
+        // The intro voice-over, read from the files shipped with the app. A missing file is not an error: the intro
+        // then plays that card without narration.
+        public static byte[][] ReadVoice()
+        {
+            byte[][] files = new byte[IntroVoice.Files.Length][];
+            for (int i = 0; i < files.Length; i++)
+            {
+                try
+                {
+                    using (System.IO.Stream s = TitleContainer.OpenStream(IntroVoice.Folder + "/" + IntroVoice.Files[i]))
+                    using (System.IO.MemoryStream m = new System.IO.MemoryStream()) { s.CopyTo(m); files[i] = m.ToArray(); }
+                }
+                catch (Exception) { files[i] = null; }
+            }
+            return files;
         }
 
         void NewMission()
@@ -153,6 +170,7 @@ namespace PaxRomana
 
         protected override void OnDeactivated(object sender, EventArgs args)
         {
+            if (Sim != null && Sim.Intro) Sim.EndIntro();              // leaving the app mid-intro: stop the narration and go to the paused mission
             if (Sim != null && Sim.Player.Enabled) Sim.SetPlaying(false);
             StopRumble();
             base.OnDeactivated(sender, args);
@@ -205,7 +223,7 @@ namespace PaxRomana
                         Renderer.SetWorld(World);
                         if (l.Pcm != null)
                         {
-                            try { synth = new SynthAudio(l.Pcm); audio = synth; } catch (Exception) { audio = new NullAudio(); }      // no audio device: play silently
+                            try { synth = new SynthAudio(l.Pcm); if (l.Voice != null) synth.SetVoice(l.Voice); audio = synth; } catch (Exception) { audio = new NullAudio(); }      // no audio device: play silently
                         }
                         NewMission();
                     }

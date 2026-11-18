@@ -1,5 +1,6 @@
-// Fully synthesised sound: rifle report with valley echo, bolt, impacts, klaxon horn, explosions, wind.
-// Every clip is computed into PCM at load (no audio files), then played through MonoGame's SoundEffect.
+// Sound. The effects are fully synthesised: rifle report with valley echo, bolt, impacts, siren, explosions, wind.
+// Each is computed into PCM at load, then played through MonoGame's SoundEffect. The one thing that comes from
+// files is the recorded voice-over for the intro (assets/voice/*.wav, made by tools/makevoice.py).
 using System;
 using System.Collections.Generic;
 using Microsoft.Xna.Framework.Audio;
@@ -202,8 +203,45 @@ namespace PaxRomana
         }
     }
 
+    // A minimal reader for the voice-over files: uncompressed 16-bit PCM in a RIFF/WAVE container.
+    public sealed class Wav
+    {
+        public int Rate, Channels; public byte[] Pcm;
+        public float Seconds { get { return Pcm.Length / 2f / Channels / Rate; } }
+
+        // Returns null if the bytes are not a 16-bit PCM WAVE file.
+        public static Wav Parse(byte[] b)
+        {
+            if (b == null || b.Length < 44 || b[0] != 'R' || b[1] != 'I' || b[2] != 'F' || b[3] != 'F' || b[8] != 'W' || b[9] != 'A' || b[10] != 'V' || b[11] != 'E') return null;
+            Wav w = new Wav(); bool fmt = false;
+            int p = 12;
+            while (p + 8 <= b.Length)
+            {
+                string id = "" + (char)b[p] + (char)b[p + 1] + (char)b[p + 2] + (char)b[p + 3];
+                int size = BitConverter.ToInt32(b, p + 4); p += 8;
+                if (size < 0 || p + size > b.Length) size = b.Length - p;
+                if (id == "fmt " && size >= 16)
+                {
+                    if (BitConverter.ToInt16(b, p) != 1 || BitConverter.ToInt16(b, p + 14) != 16) return null;       // PCM, 16 bits
+                    w.Channels = BitConverter.ToInt16(b, p + 2); w.Rate = BitConverter.ToInt32(b, p + 4); fmt = true;
+                }
+                else if (id == "data")
+                {
+                    if (!fmt || w.Channels < 1 || w.Channels > 2 || w.Rate < 8000) return null;
+                    w.Pcm = new byte[size - size % (2 * w.Channels)];
+                    Buffer.BlockCopy(b, p, w.Pcm, 0, w.Pcm.Length);
+                    return w;
+                }
+                p += size + (size & 1);
+            }
+            return null;
+        }
+    }
+
     public sealed class SynthAudio : IAudio
     {
+        SoundEffect[] voice; SoundEffectInstance speaking;
+
         readonly Dictionary<string, SoundEffect> clips = new Dictionary<string, SoundEffect>();
         struct Pending { public string Name; public float Delay, Vol; }
         readonly List<Pending> queue = new List<Pending>();
@@ -252,5 +290,29 @@ namespace PaxRomana
         public void Door() { Play("door"); }
         public void Loot() { Play("loot"); }
         public void Step() { Play("step" + M.Rng.Next(3), 0.8f); }
+
+        // The recorded voice-over clips, in the order of IntroVoice.Files. A file that is missing or unreadable is
+        // skipped: that card simply plays without narration. Call on the main thread.
+        public void SetVoice(byte[][] files)
+        {
+            voice = new SoundEffect[files.Length];
+            for (int i = 0; i < files.Length; i++)
+            {
+                Wav w = Wav.Parse(files[i]);
+                if (w != null) voice[i] = new SoundEffect(w.Pcm, w.Rate, w.Channels == 2 ? AudioChannels.Stereo : AudioChannels.Mono);
+            }
+        }
+        public void Voice(int clip)
+        {
+            StopVoice();
+            if (voice == null || clip < 0 || clip >= voice.Length || voice[clip] == null) return;
+            try { speaking = voice[clip].CreateInstance(); speaking.Volume = M.Clamp(Master); speaking.Play(); } catch (Exception) { speaking = null; }
+        }
+        public void StopVoice()
+        {
+            if (speaking == null) return;
+            try { speaking.Stop(); speaking.Dispose(); } catch (Exception) { }
+            speaking = null;
+        }
     }
 }

@@ -20,6 +20,8 @@ Commands run from `PaxRomana-XBOX-CSharp-src/` unless a `cd` says otherwise.
 | Build the Xbox package | `git push`, then `gh run watch` |
 | Install on the console | `XBOX_IP=… XBOX_USER=… XBOX_PASS=… ./deploy.sh` |
 | Install a newer build | `rm -rf package`, then `deploy.sh` again |
+| Change the intro narration | Edit the lines in `tools/makevoice.py`, then `ELEVENLABS_API_KEY=… python3 tools/makevoice.py` |
+| Check the voice-over is packaged | `cd desktop && dotnet run -c Release -- --voice-check` |
 
 ## What you need
 
@@ -29,6 +31,7 @@ Commands run from `PaxRomana-XBOX-CSharp-src/` unless a `cd` says otherwise.
 | Building the Xbox package | Nothing locally. GitHub Actions builds it on a Windows runner. The package cannot be built on macOS. |
 | Installing on the console | The GitHub CLI, signed in (`gh auth status`), and `curl`. The console in Developer Mode with the Xbox Device Portal enabled, on the same network as the Mac. |
 | Rebuilding the fonts (rare) | Python 3 with Pillow |
+| Regenerating the intro voice-over (rare) | Python 3 and an ElevenLabs API key in the environment |
 
 ## Running on Xbox
 
@@ -88,7 +91,8 @@ For the best frame rate, change its type from *App* to *Game*: highlight the app
 Nothing has run on the console yet, so the first launch is the test. Things to look at:
 
 1. It reaches the title panel with no WebView2 message, the loading bar completes, **A** starts the Level Zero intro,
-   and **A** again (or waiting 27 seconds) starts the mission.
+   and **A** again (or waiting about 40 seconds) starts the mission. The narration should be audible over the
+   intro and stop when it is skipped.
 2. The picture fills the screen and no HUD text is cut off at the edges.
 3. Sound plays, and the controller vibrates on a shot, including the right trigger.
 4. Turning in the courtyard and looking across the valley through the scope are smooth.
@@ -121,7 +125,7 @@ Example: `dotnet run -c Release -- --console --mute`
 This plays a mission with no window, sound or controller: it starts with **A**, skips the intro (and later lets it
 play through), walks and turns, fires a round and checks the vibration, skips one kill-cam and watches another,
 breaches the gate, opens the keep and the vault, takes the keys, wins, restarts, opens a door and synthesises the
-sound. It prints one line per check (58 in all) and exits non-zero if any fails. It
+sound. It prints one line per check (67 in all, including that the four voice-over clips are present and fit their cards) and exits non-zero if any fails. It
 takes a few seconds.
 
     cd PaxRomana-XBOX-CSharp-src
@@ -150,7 +154,8 @@ control) is tabulated in the PRD, section 10.13.
 | `xbox/` | The UWP app: project, manifest, tiles and a 49-line entry point around `Game/`. |
 | `desktop/` | The desktop launcher and the `--shots` mode. |
 | `tests/` | The rules test. |
-| `tools/` | `makefont.py` and the two fonts it bakes, and `apicheck`. |
+| `assets/` | The intro voice-over (`assets/voice/intro1.wav` to `intro4.wav`), the only files the game loads at run time. |
+| `tools/` | `makefont.py` and the two fonts it bakes, `makevoice.py` (the voice-over generator), and `apicheck`. |
 | `build.ps1` | Builds and signs the Xbox package. Runs on Windows only; the workflow calls it. |
 | `deploy.sh` | Installs the package on the console. |
 
