@@ -1,24 +1,34 @@
-# Pax Romana: Tertia Roma (native C#)
+# Pax Romana, Level Zero: The Keys (native C#)
 
-The Xbox game from `../PaxRomana-XBOX-src`, rewritten in C#. There is no web view and no JavaScript: the console runs
-compiled C# on [MonoGame](https://monogame.net) (Direct3D 11, XAudio2, the Xbox controller API). It was written because
-the web edition needs the Edge WebView2 runtime, which the console did not have.
+A first-person sniper game for Xbox, written in C#. There is no web view and no JavaScript: the console runs compiled
+C# on [MonoGame](https://monogame.net) (Direct3D 11, XAudio2, the Xbox controller API). It began as a rewrite of the
+web game in `../PaxRomana-XBOX-src`, which needs the Edge WebView2 runtime that the console did not have.
 
-Rome never fell; in 2187 the legions of the Third Rome hold the Kremlin above a frozen, neon-lit Moscow. From a ridge
-across the Moskva, clear the defenders inside the walls and raise your standard at the flagpole in the courtyard to
-**capture the Kremlin**. Your rifle fires sniper rounds and **explosive charges** (8 per mission). A charge flies the
-same trajectory as a bullet, kills everything within about 8 m of where it lands, and blows doors and the Spasskaya
-gate off their hinges.
+**Level Zero.** Bavaria, summer 1944. Beyond the valley the Reich is enriching uranium-235 in a walled works. The keys
+to that enrichment zone lie in a strongbox in the vault of Burg Adlerstein, a hill castle held by a garrison of 29.
+You are an agent of the Research and Analysis Wing. From a ridge across the river, clear the defenders inside the
+castle walls, get into the keep, and **take the keys**. Later levels use them to enter the enrichment zone and
+subvert it from the inside.
 
-## What is the same, and what is not
+The level opens with an intro: a "Level Zero" title card and three briefing cards over a flight across the valley,
+the works and the castle. It plays once per session and **A** skips it.
 
-The rules are a direct port and are checked by a test (below): the valley, the Kremlin and its rooms, the
-garrison's patrols and alert, free roam with collision, wading, swimming and the bridge, ballistics with drop, wind and
-sight zero, the kill-cam, explosive charges, doors, the capture, the HUD and menus, the controller layout and every
-haptic cue.
+Your rifle fires sniper rounds and **explosive charges** (8 per mission). A charge flies the same trajectory as a
+bullet, kills everything within about 8 m of where it lands, and blows doors and the castle gate off their hinges.
 
-The picture is simpler. This edition uses only MonoGame's built-in shaders, so that nothing has to be compiled or
-loaded from files:
+## How this differs from the web game
+
+The rules began as a direct port of the web game and are checked by a test (below): free roam with collision, wading,
+swimming and the bridge, ballistics with drop, wind and sight zero, the kill-cam, explosive charges, doors, the HUD
+and menus, the controller layout and every haptic cue.
+
+The setting and the objective are new in this edition. The web game is a winter Kremlin held by Roman legionaries,
+captured by raising a standard in the courtyard. Level Zero is a summer valley, a German castle with a wartime
+garrison, and the keys in the vault. The garrison flies the historical flag; `Config.HISTORICAL_INSIGNIA` in
+`Game/Core.cs` switches it to a plain black cross for places where showing that symbol is restricted.
+
+The picture is simpler than the web game's. This edition uses only MonoGame's built-in shaders, so that nothing has
+to be compiled or loaded from files:
 
 - no real-time shadows (soldiers get a soft blob shadow), no bloom, tone mapping or film grain
 - the scope has no lens distortion or colour fringing
@@ -39,7 +49,7 @@ loaded from files:
 | D-pad up / down, or Y | Zoom |
 | D-pad left / right | Sight zero, 100 to 600 m |
 | X | Reload |
-| A | Open or close the nearest door, skip the kill-cam |
+| A | Open or close the nearest door, skip the intro or the kill-cam |
 | B / click right stick | Crouch / prone |
 | View | Show all controls |
 | Menu | Pause |
@@ -61,7 +71,7 @@ All four motors of the Xbox controller are used, including the impulse motors in
 | Holding breath | A two-beat heartbeat |
 | Reload | Four light ticks |
 | Scope up, doors, being spotted, the alarm | Light cues |
-| Capturing the flag | A pulse that builds, then a long rumble when the Kremlin is yours |
+| Cracking the strongbox | A pulse that builds, then a long rumble when the keys are yours |
 
 ## Layout
 
@@ -98,9 +108,10 @@ Options go after `--`:
     cd tests
     dotnet run -c Release
 
-Runs a mission without a window: starts with **A**, walks and turns with the sticks, fires a round and checks the
-vibration it produces, skips one kill-cam and watches another, breaches the gate with a charge, captures the flag, wins,
-restarts, opens a door by hand, and synthesises the sound clips. It exits with a non-zero code if any check fails. The GitHub workflow runs it before every Xbox build.
+Runs a mission without a window: starts with **A**, skips the intro (and later lets it play through), walks and turns
+with the sticks, fires a round and checks the vibration it produces, skips one kill-cam and watches another, breaches
+the gate with a charge, opens the keep and the vault, takes the keys, wins, restarts, opens a door by hand, and
+synthesises the sound clips. It exits with a non-zero code if any check fails. The GitHub workflow runs it before every Xbox build.
 
 `dotnet build tools/apicheck` compiles `Game/` against .NET Standard 2.0 and C# 7.3, the limits of the Xbox build, so
 code the console cannot compile is caught without Windows.
@@ -125,7 +136,7 @@ yourself instead: `powershell -ExecutionPolicy Bypass -File .\build.ps1`.
 It downloads the newest build from GitHub (needs `gh`) into `./package` if that folder is missing, then uploads it
 through the Device Portal. Delete `./package` to fetch a newer build.
 
-**Run.** Launch **Pax Romana: Tertia Roma (Native)** from Dev Home. It is a separate app from the web edition, so both
+**Run.** Launch **Pax Romana: Tertia Roma (Native)** from Dev Home (the app keeps that name for now). It is a separate app from the web edition, so both
 can be installed at once.
 
 For the smoothest frame rate, switch the app's type from *App* to *Game* in Dev Home (highlight the app, press View,

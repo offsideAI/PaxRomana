@@ -1,5 +1,6 @@
-// PAX ROMANA: TERTIA ROMA. Capture the Kremlin of a future Moscow.
-// World holds everything that is built once (terrain, Kremlin, skyline, trees). GameSim is one mission: the rules,
+// PAX ROMANA, Level Zero: The Keys. Bavaria, summer 1944. An agent of the Research and Analysis Wing takes the keys
+// to the U-235 enrichment zone from the vault of a garrisoned castle.
+// World holds everything that is built once (terrain, castle, enrichment works, trees). GameSim is one mission: the rules,
 // input handling and haptics, with no drawing or device access, so it can run headless in tests.
 using System;
 using System.Collections.Generic;
@@ -9,24 +10,24 @@ namespace PaxRomana
 {
     public sealed class World
     {
-        public Textures Tex; public List<IndexedMesh> Terrain; public Castle Castle; public City City; public Vegetation Veg;
+        public Textures Tex; public List<IndexedMesh> Terrain; public Castle Castle; public Works Works; public Vegetation Veg;
         public Colliders Colliders; public Geo[][] SoldierParts; public Geo Rifle, Bolt;
         public readonly List<Solid> Solids = new List<Solid>();
 
         public static World Build(Action<float, string> progress, bool textures = true, int grassCount = 40000)
         {
             World w = new World();
-            progress(0.03f, "Firing Kremlin brick…");
-            if (textures) w.Tex = Textures.Make(p => progress(0.03f + p * 0.27f, "Firing Kremlin brick…"));
-            progress(0.3f, "Laying snow over the Moskva valley…");
+            progress(0.03f, "Quarrying castle stone…");
+            if (textures) w.Tex = Textures.Make(p => progress(0.03f + p * 0.27f, "Quarrying castle stone…"));
+            progress(0.3f, "Growing summer grass along the river…");
             w.Terrain = PaxRomana.Terrain.Build();
-            progress(0.5f, "Raising the Kremlin and the skyline…");
+            progress(0.5f, "Raising Burg Adlerstein and the enrichment works…");
             w.Castle = Castle.Build();
-            w.City = City.Build();
+            w.Works = Works.Build();
             w.Colliders = new Colliders(w.Castle);
-            progress(0.65f, "Frosting the birch and pine…");
+            progress(0.65f, "Leafing the birch and pine…");
             w.Veg = Vegetation.Build(grassCount);
-            progress(0.85f, "Mustering the legion…");
+            progress(0.85f, "Posting the garrison…");
             w.SoldierParts = Soldier.BuildParts();
             w.Rifle = Weapon.BuildRifle(); w.Bolt = Weapon.BuildBolt();
             w.Solids.AddRange(w.Castle.Solids); w.Solids.AddRange(w.Veg.Obstacles);
@@ -37,11 +38,14 @@ namespace PaxRomana
 
     public sealed class GameSim
     {
-        public readonly World World; public readonly Legion Legion; public readonly Fx Fx; public readonly IAudio Audio; public readonly Player Player;
+        public readonly World World; public readonly Garrison Garrison; public readonly Fx Fx; public readonly IAudio Audio; public readonly Player Player;
         public readonly Capture Capture; public readonly Weapon Weapon; public readonly Colliders Colliders; public readonly Hud Hud; public readonly Pad Pad; public readonly KeyMouse Km;
         public bool Console;                 // running on the console: controller prompts from the start
         public bool Started, Over, Win, RestartRequested;
         public bool AlwaysKillCam;           // every predicted hit gets the kill-cam (used by the visual check)
+        public bool ShowIntro = true;        // play the Level Zero intro before the first mission of a session
+        public bool Intro;                   // the intro is playing
+        public float IntroT;
         public float Time, GameTime, Clock; public int Alarms;
         float endT = -1, timeScale = 1, range, rangeT, edgeT, spotT, hintDelay = -1, titleT;
         bool ltHeld, rtHeld, spotted;
@@ -64,18 +68,18 @@ namespace PaxRomana
             World = world; Audio = audio; Pad = pad; Km = km; Hud = hud;
             world.Castle.Reset();
             Colliders = world.Colliders;
-            Legion = new Legion(world.Castle);
+            Garrison = new Garrison(world.Castle);
             Fx = new Fx();
             for (int i = 0; i < world.Castle.Smoke.Count; i++) Fx.AddSmoke(world.Castle.Smoke[i], i < 2 ? 1 : 1.5f);
-            Player = new Player(world.Solids, audio, Legion.Soldiers, pad, km);
-            Capture = new Capture(world.Castle, Player, Legion, hud, audio, pad);
+            Player = new Player(world.Solids, audio, Garrison.Soldiers, pad, km);
+            Capture = new Capture(world.Castle, Player, Garrison, hud, audio, pad);
             Weapon = new Weapon(this, Player);
-            Hud.Total = Legion.Total;
+            Hud.Total = Garrison.Total;
 
-            Legion.OnAlarm = () =>
+            Garrison.OnAlarm = () =>
             {
                 Alarms++; Audio.Horn();
-                Hud.Feed("<b>ALARM</b> the klaxon sounds. The garrison is running.", "warn");
+                Hud.Feed("<b>ALARM</b> the siren sounds. The garrison is running.", "warn");
                 Pad.Rumble(low: 0.35f, ms: 500, decay: true); Pad.Rumble(low: 0.35f, ms: 500, delay: 700, decay: true);
             };
             // ---- haptics: what the controller feels ----
@@ -88,14 +92,14 @@ namespace PaxRomana
             };
             Weapon.OnDry = () => Pad.Rumble(rt: 0.3f, ms: 35);
             Player.OnHeartbeat = () => { Pad.Rumble(low: 0.22f, ms: 70); Pad.Rumble(low: 0.15f, ms: 70, delay: 170); };
-            Player.OnEdge = () => { if (edgeT <= 0) { edgeT = 6; Hud.Hint("Edge of the valley. The Kremlin lies behind you", 3000); } };
+            Player.OnEdge = () => { if (edgeT <= 0) { edgeT = 6; Hud.Hint("Edge of the valley. The castle lies behind you", 3000); } };
             SetTitleCamera();
         }
 
         public void OnKill(HitResult r)
         {
             Hud.Hitmarker(r.Head);
-            string who = r.Soldier.Centurion ? "Centurion" : "Legionary";
+            string who = r.Soldier.Officer ? "Officer" : "Soldier";
             Pad.Rumble(high: r.Head ? 0.7f : 0.4f, lt: r.Head ? 0.5f : 0, ms: r.Head ? 110 : 60);
             Hud.Feed(who + " down <em>" + (int)Math.Round(r.Dist) + " m</em>" + (r.Head ? " <b>HEADSHOT</b>" : ""), r.Head ? "head" : "");
         }
@@ -108,16 +112,16 @@ namespace PaxRomana
             Pad.Rumble(low: k, high: k * 0.7f, lt: k * 0.4f, rt: k * 0.4f, ms: 380 + 520 * k, delay: delay * 1000, decay: true);
             Player.Shake = Math.Max(Player.Shake, M.Clamp(1.6f - dist / 45, 0, 1.6f));
             int kills = 0;
-            foreach (Soldier s in Legion.Soldiers)
+            foreach (Soldier s in Garrison.Soldiers)
             {
                 if (!s.Alive) continue;
                 Vector3 v = s.Pos; v.Y += 0.9f;
                 if (Vector3.Distance(v, at) > BLAST) continue;
                 v -= at; v.Y = Math.Abs(v.Y) + 1.5f; v.Normalize();
-                Legion.Kill(s, v, false);
+                Garrison.Kill(s, v, false);
                 kills++; Weapon.Hits++; Weapon.Longest = Math.Max(Weapon.Longest, dist);
             }
-            Legion.AlertAround(at, 70, 25, 40);
+            Garrison.AlertAround(at, 70, 25, 40);
             Capture.Blast(at);
             if (kills > 0) { Hud.Hitmarker(false); Hud.Feed("Blast <em>" + (int)Math.Round(dist) + " m</em> <b>" + kills + " DOWN</b>", "head"); }
         }
@@ -143,7 +147,7 @@ namespace PaxRomana
             if (Colliders.Raycast(o, dir, best > 0 ? best : 1800, out hd, out hn, out wood)) best = hd;
             float reach = best > 0 ? best : 1800;
             Vector3 end = o + dir * reach;
-            foreach (Soldier s in Legion.Soldiers)
+            foreach (Soldier s in Garrison.Soldiers)
             {
                 SoldierHit h = s.HitTest(o, end);
                 if (h.Hit) { float d = h.T * reach; if (best == 0 || d < best) best = d; }
@@ -170,7 +174,7 @@ namespace PaxRomana
             if (kcCooldown > 0) return;
             Predicted hit = Weapon.Predict(b);
             if (hit == null) return;
-            float dist = Vector3.Distance(hit.Point, Player.Cam.Pos); bool last = Legion.AliveCount == 1;
+            float dist = Vector3.Distance(hit.Point, Player.Cam.Pos); bool last = Garrison.AliveCount == 1;
             if (dist > 90 && (AlwaysKillCam || last || (hit.Head && M.Rand() < 0.65f) || M.Rand() < 0.22f)) StartKillCam(b, hit);
         }
 
@@ -199,6 +203,7 @@ namespace PaxRomana
             bool rt = Pad.Value(Btn.RT) > 0.5f, rtEdge = rt && !rtHeld;
             rtHeld = rt;
             if (Over) { if (a || menu) RestartRequested = true; return; }
+            if (Intro) { if ((a || menu || rtEdge) && IntroT > 0.5f) EndIntro(); return; }
             if (!Player.Enabled) { if ((a || menu) && Hud.Ready) Begin(true); return; }      // title or pause screen
             if (menu) { SetPlaying(false); return; }
             if (Pad.Pressed(Btn.VIEW)) Hud.ToggleKeys();
@@ -224,6 +229,7 @@ namespace PaxRomana
             if (Km.AnyInput) Pad.Active = false;
             bool go = Km.Pressed(K.Enter) || Km.Pressed(K.Space) || Km.LeftHit;
             if (Over) { if (go) RestartRequested = true; return; }
+            if (Intro) { if ((go || Km.Pressed(K.Escape)) && IntroT > 0.5f) EndIntro(); return; }
             if (!Player.Enabled) { if (go && Hud.Ready) Begin(false); return; }
             if (Km.Pressed(K.Escape)) { SetPlaying(false); return; }
             if (Km.Pressed(K.C)) Player.ToggleStance(1);
@@ -251,7 +257,7 @@ namespace PaxRomana
             if (Pad.Active)
             {
                 Vector3 dir = Player.Cam.Forward, o = Player.Cam.Pos;
-                foreach (Soldier s in Legion.Soldiers)
+                foreach (Soldier s in Garrison.Soldiers)
                 {
                     if (!s.Alive) continue;
                     Vector3 v = s.Pos; v.Y += 1.1f; v -= o;
@@ -271,7 +277,7 @@ namespace PaxRomana
             float R = (Player.Stance == 0 ? 45 : Player.Stance == 1 ? 28 : 13) * (Player.Swimming ? 0.5f : 1);
             bool seen = false;
             Vector3 eye = Player.Cam.Pos;
-            foreach (Soldier s in Legion.Soldiers)
+            foreach (Soldier s in Garrison.Soldiers)
             {
                 if (!s.Alive) continue;
                 Vector3 head = s.Pos; head.Y += 1.67f;
@@ -281,7 +287,7 @@ namespace PaxRomana
             }
             if (seen)
             {
-                Legion.AlertAround(Player.Pos, R + 25, 12, 14);
+                Garrison.AlertAround(Player.Pos, R + 25, 12, 14);
                 if (!spotted) { Hud.Feed("<b>SPOTTED</b> a sentry has seen you", "warn"); Pad.Rumble(low: 0.4f, high: 0.2f, ms: 180, decay: true); }
             }
             spotted = seen;
@@ -299,8 +305,51 @@ namespace PaxRomana
         public void Begin(bool viaPad)
         {
             padMode = viaPad;
+            if (!Started && ShowIntro && !Intro) { StartIntro(); return; }
             SetPlaying(true);
             if (!Started) { Started = true; hintDelay = 1.2f; }
+        }
+
+        // ---- the Level Zero intro: title and briefing cards over a flight across the valley ----
+        void StartIntro()
+        {
+            Intro = true; IntroT = 0; ShowIntro = false;
+            Hud.ShowMenu(false, false); Hud.Cine = true; Hud.IntroOn = true; Hud.IntroT = 0;
+        }
+        public void EndIntro()
+        {
+            if (!Intro) return;
+            Intro = false; Hud.Cine = false; Hud.IntroOn = false;
+            Begin(padMode);
+        }
+
+        // Camera path of the intro: position and target at a handful of moments, eased between them.
+        static readonly float[][] IntroPath =
+        {
+            //        t      camera x, y, z          looks at x, y, z
+            new[] {  0f,     150, 96, 470,            0, 44, 0 },                                          // from behind the ridge, the castle across the valley
+            new[] {  6.6f,   110, 78, 300,            0, 46, 0 },
+            new[] {  7.0f,   -60, 120, 110,           Config.WORKS_X, 30, Config.WORKS_Z },                // over the castle towards the works
+            new[] { 13.4f,   120, 105, -160,          Config.WORKS_X, 34, Config.WORKS_Z },
+            new[] { 13.8f,   72, 74, 84,              0, 50, -8 },                                         // round the keep
+            new[] { 20.2f,   -68, 70, 78,             0, 48, -8 },
+            new[] { 20.6f,   Config.SPAWN_X + 22, 88, Config.SPAWN_Z + 30,   0, 40, 0 },                    // back to the nest
+            new[] { 27f,     Config.SPAWN_X, 79, Config.SPAWN_Z + 2,         0, 40, 0 },
+        };
+
+        void SetIntroCamera()
+        {
+            float t = Math.Min(IntroT, IntroScript.Length);
+            int i = 0;
+            while (i < IntroPath.Length - 2 && t >= IntroPath[i + 1][0]) i++;
+            float[] a = IntroPath[i], b = IntroPath[i + 1];
+            float k = M.Smoothstep(0, 1, (t - a[0]) / (b[0] - a[0]));
+            if (b[0] - a[0] < 1) k = k < 0.5f ? 0 : 1;          // a cut, not a move
+            Vector3 pos = Vector3.Lerp(new Vector3(a[1], a[2], a[3]), new Vector3(b[1], b[2], b[3]), k);
+            Vector3 look = Vector3.Lerp(new Vector3(a[4], a[5], a[6]), new Vector3(b[4], b[5], b[6]), k);
+            pos.Y = Math.Max(pos.Y, Terrain.GroundAt(pos.X, pos.Z) + 3);
+            Player.Cam.LookAt(pos, look);
+            Player.Cam.Fov = 52; Player.Cam.Near = 0.5f;
         }
 
         void SetTitleCamera()
@@ -368,7 +417,7 @@ namespace PaxRomana
                 edgeT -= dtReal; spotT -= dt;
                 if (spotT <= 0 && Started && !Over && !KcActive) { spotT = 0.5f; Watch(); }
                 Weapon.Update(dtReal, dt, !KcActive && Started);
-                Legion.Update(dt, GameTime);
+                Garrison.Update(dt, GameTime);
                 if (Started && !Over) Time += dt;
             }
             Camera cam = ActiveCam;
@@ -382,8 +431,8 @@ namespace PaxRomana
             // HUD
             if (Started)
             {
-                Hud.Kills = Legion.Total - Legion.AliveCount; Hud.Total = Legion.Total;
-                Hud.Alert = Legion.AlertLevel; Hud.Alarm = Legion.Alarm;
+                Hud.Kills = Garrison.Total - Garrison.AliveCount; Hud.Total = Garrison.Total;
+                Hud.Alert = Garrison.AlertLevel; Hud.Alarm = Garrison.Alarm;
                 Hud.Mag = Weapon.Mag; Hud.Reserve = Weapon.Reserve; Hud.Charges = Weapon.Charges;
                 Hud.Stance = Player.Stance;
                 Hud.Status = Weapon.ReloadT > 0 ? "RELOADING" : Weapon.Mag == 0 ? (Weapon.Reserve > 0 ? (Hud.IsPad ? "PRESS X TO RELOAD" : "PRESS R TO RELOAD") : "NO AMMUNITION") : "";
@@ -409,7 +458,7 @@ namespace PaxRomana
                         Over = true; Player.Enabled = false; Pad.Stop();
                         Hud.End(Win, new EndStats
                         {
-                            Kills = Legion.Total - Legion.AliveCount, Total = Legion.Total, Shots = Weapon.Shots, Hits = Weapon.Hits, Heads = Weapon.Heads,
+                            Kills = Garrison.Total - Garrison.AliveCount, Total = Garrison.Total, Shots = Weapon.Shots, Hits = Weapon.Hits, Heads = Weapon.Heads,
                             Longest = Weapon.Longest, Time = Time, Alarms = Alarms, Charges = 8 - Weapon.Charges,
                         });
                     }
@@ -417,9 +466,17 @@ namespace PaxRomana
             }
             else
             {
-                // title screen: slow establishing drift over the valley
-                titleT += dtReal;
-                SetTitleCamera();
+                if (Intro)
+                {
+                    IntroT += dtReal; Hud.IntroT = IntroT;
+                    if (IntroT >= IntroScript.Length) EndIntro(); else SetIntroCamera();
+                }
+                else
+                {
+                    // title screen: slow establishing drift over the valley
+                    titleT += dtReal;
+                    SetTitleCamera();
+                }
             }
 
             GradeScope = KcActive ? 0 : M.Smoothstep(0.7f, 0.9f, Weapon.Ads);

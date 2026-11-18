@@ -27,7 +27,7 @@
     <Application Id="App" Executable="$targetnametoken$.exe" EntryPoint="PaxRomanaNative.App">
       <uap:VisualElements
         DisplayName="Pax Romana: Tertia Roma (Native)"
-        Description="Capture the Kremlin of a future Moscow"
+        Description="Level Zero: take the keys from the castle vault"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png"
         BackgroundColor="#0C0E18">

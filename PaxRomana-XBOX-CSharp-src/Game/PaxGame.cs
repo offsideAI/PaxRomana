@@ -27,6 +27,7 @@ namespace PaxRomana
         protected RenderTarget2D Output;        // where the finished frame goes; null = the screen
         RenderTarget2D scene; SpriteBatch blit; bool noMsaa;
         string fatal;                           // set if the game hit an error it could not recover from
+        bool introShown;
 
         public PaxGame()
         {
@@ -59,7 +60,8 @@ namespace PaxRomana
         {
             Hud hud = new Hud();
             hud.SetReady();
-            Sim = new GameSim(World, audio, pad, km, hud) { Console = IsConsole };
+            Sim = new GameSim(World, audio, pad, km, hud) { Console = IsConsole, ShowIntro = !introShown };
+            introShown = true;          // the intro plays once per session, not on every new mission
             pad.Stop();
         }
 
@@ -212,7 +214,7 @@ namespace PaxRomana
             }
             else
             {
-                bool onMenu = !Sim.Player.Enabled;
+                bool onMenu = !Sim.Player.Enabled && !Sim.Intro;
                 Sim.Frame(dt);
                 if (synth != null) synth.Update(dt);
                 SendRumble(false);

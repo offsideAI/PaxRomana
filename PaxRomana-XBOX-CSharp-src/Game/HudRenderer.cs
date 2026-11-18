@@ -139,6 +139,7 @@ namespace PaxRomana
             fade += ((hud.Cine ? 0 : 1) - fade) * 0.2f;
             if (inGame && fade > 0.01f) InGame(hud);
             if (hud.CineK > 0.005f) { float bar = 0.105f * H * hud.CineK; Rect(0, 0, W, bar, Color.Black); Rect(0, H - bar, W, bar, Color.Black); }
+            if (hud.IntroOn) IntroCards(hud);
             if (hud.EndVisible) End(hud);
             else if (hud.MenuVisible) Menu(hud, sim != null && sim.Started);
             sb.End();
@@ -208,7 +209,7 @@ namespace PaxRomana
                 float w = Text(bold, hud.Kills.ToString(), x, cy, 34 * U, A(Bone, f));
                 w += Text(ui, "/", x + w + 4 * U, cy + 9 * U, 22 * U, A(Bone, f * 0.5f)) + 8 * U;
                 w += Text(bold, hud.Total.ToString(), x + w, cy, 34 * U, A(Bone, f));
-                Text(ui, "LEGIONARIES DOWN", x + w + 12 * U, cy + 16 * U, 13 * U, A(Bone, f * 0.7f), 0, 0.2f);
+                Text(ui, "DEFENDERS DOWN", x + w + 12 * U, cy + 16 * U, 13 * U, A(Bone, f * 0.7f), 0, 0.2f);
                 cy += 46 * U;
                 bool pulse = hud.Alarm && (DateTime.UtcNow.Millisecond / 350) % 2 == 0;
                 Text(ui, hud.Alarm ? "ALARM" : "GARRISON ALERT", x, cy, 11 * U, hud.Alarm ? A(new Color(255, 90, 72), f * (pulse ? 0.4f : 1)) : A(Bone, f * 0.7f), 0, 0.26f);
@@ -282,7 +283,7 @@ namespace PaxRomana
                 float right = W - sx, y = H - sy;
                 string st = hud.Stance == 0 ? "STANDING" : hud.Stance == 1 ? "CROUCHED" : "PRONE";
                 float sw = Text(ui, st, right, y - 14 * U, 11 * U, A(Gold, f), 2, 0.24f);
-                Text(ui, "GAUSS RIFLE · EXPLOSIVE CHARGES", right - sw - 14 * U, y - 14 * U, 11 * U, A(Bone, f * 0.7f), 2, 0.24f);
+                Text(ui, "SNIPER RIFLE · EXPLOSIVE CHARGES", right - sw - 14 * U, y - 14 * U, 11 * U, A(Bone, f * 0.7f), 2, 0.24f);
                 y -= 22 * U;
                 float rw = Text(ui, hud.Reserve.ToString(), right, y - 34 * U, 28 * U, A(Bone, f * 0.75f), 2);
                 float slw = Text(ui, "/", right - rw - 6 * U, y - 34 * U, 26 * U, A(Bone, f * 0.5f), 2);
@@ -367,17 +368,17 @@ namespace PaxRomana
         {
             Veil();
             float w = 800 * U, h = 600 * U, x = (W - w) / 2, y = Panel(w, h), cx = W / 2, cy = y + 40 * U;
-            Text(ui, "MOSCOVIA · ANNO DOMINI MMCLXXXVII", cx, cy, 13 * U, Gold, 1, 0.34f); cy += 28 * U;
+            Text(ui, "LEVEL ZERO · BAVARIA · SUMMER 1944", cx, cy, 13 * U, Gold, 1, 0.34f); cy += 28 * U;
             float t1 = Width(display, "PAX ", 84 * U, 0.1f), t2 = Width(display, "ROMANA", 84 * U, 0.1f), tx = cx - (t1 + t2 - 0.1f * 84 * U) / 2;
             Text(display, "PAX", tx, cy, 84 * U, Bone, 0, 0.1f); Text(display, "ROMANA", tx + t1, cy, 84 * U, Gold, 0, 0.1f); cy += 98 * U;
             Color sub = A(Bone, 0.82f);
-            Text(ui, "Rome never fell. In 2187 the legions of the Third Rome hold the Kremlin above a frozen, neon-lit Moscow.", cx, cy, 18 * U, sub, 1, 0.02f); cy += 26 * U;
-            Text(ui, "From the ridge across the Moskva, one rifle will change that.", cx, cy, 18 * U, sub, 1, 0.02f); cy += 44 * U;
+            Text(ui, "The Reich is enriching uranium-235. The keys to the works lie in the vault of Burg Adlerstein.", cx, cy, 18 * U, sub, 1, 0.02f); cy += 26 * U;
+            Text(ui, "You are an agent of the Research and Analysis Wing. One rifle, from the ridge across the river.", cx, cy, 18 * U, sub, 1, 0.02f); cy += 44 * U;
             Rect(x + 52 * U, cy, w - 104 * U, Math.Max(1, U), A(Gold, 0.2f)); cy += 22 * U;
             float colL = x + 52 * U, colW = (w - 104 * U - 34 * U) * 0.535f, colR = colL + colW + 34 * U, colRW = w - 104 * U - 34 * U - colW;
             Text(display, "MISSION", colL, cy, 13 * U, Gold, 0, 0.3f); Text(display, "CONTROLS", colR, cy, 13 * U, Gold, 0, 0.3f);
             float ly = cy + 26 * U; Color body = A(Bone, 0.85f);
-            ly += Rich("<b>Capture the Kremlin.</b> Clear every defender inside the walls, then raise your standard at the flagpole in the courtyard.", colL, ly, 16 * U, colW, 23 * U, body, Bone) + 8 * U;
+            ly += Rich("<b>Take the keys.</b> Clear every defender inside the castle walls, then crack the strongbox in the vault of the keep.", colL, ly, 16 * U, colW, 23 * U, body, Bone) + 8 * U;
             ly += Rich("Your rifle fires sniper rounds and <b>explosive charges</b>. A charge kills everything near it and blows doors and the gate off their hinges.", colL, ly, 16 * U, colW, 23 * U, body, Bone);
             string[] list = hud.IsPad
                 ? new[] { "<k>LT</k> scope <k>RT</k> fire <k>RB</k> explosive", "<k>LB</k> hold breath <k>X</k> reload", "<k>A</k> doors <k>B</k> crouch", "D-pad zoom and zero", "<k>View</k> all controls <k>Menu</k> pause" }
@@ -393,20 +394,53 @@ namespace PaxRomana
             Text(ui, lt.ToUpperInvariant(), cx, cy, 13 * U, A(Bone, 0.6f), 1, 0.2f);
         }
 
+        // The Level Zero intro: a title card, then three briefing cards, in the lower part of the picture over the flight.
+        void IntroCards(Hud hud)
+        {
+            float t = hud.IntroT, cx = W / 2;
+            // open on black, and dip to black at the cuts between shots
+            float dark = 1 - M.Smoothstep(0.0f, 1.2f, t);
+            foreach (float cut in new[] { 6.8f, 13.6f, 20.4f }) dark = Math.Max(dark, 1 - M.Clamp(Math.Abs(t - cut) / 0.45f));
+            dark = Math.Max(dark, M.Smoothstep(IntroScript.Length - 0.5f, IntroScript.Length, t));
+            if (dark > 0.004f) Rect(0, 0, W, H, A(Color.Black, dark));
+            IntroCard c = IntroScript.At(t);
+            if (c != null)
+            {
+                float a = M.Smoothstep(0, 0.7f, t - c.Start) * M.Smoothstep(0, 0.6f, c.End - t);
+                if (c.Title != null)
+                {
+                    float y = 0.36f * H;
+                    Rect(0, 0, W, H, A(Color.Black, 0.38f * a));
+                    Text(ui, c.Kicker, cx, y, 14 * U, A(Gold, a), 1, 0.36f); y += 34 * U;
+                    Text(display, c.Title, cx, y, 96 * U, A(Bone, a), 1, 0.1f); y += 112 * U;
+                    Rect(cx - 90 * U, y, 180 * U, Math.Max(1, U), A(Gold, 0.6f * a)); y += 18 * U;
+                    Text(display, c.Sub, cx, y, 26 * U, A(Gold, a), 1, 0.34f);
+                }
+                else
+                {
+                    float y = 0.66f * H, w = Math.Min(0.8f * W, 900 * U);
+                    Rect(0, y - 26 * U, W, 150 * U, new Color((byte)6, (byte)6, (byte)5, (byte)(120 * a)));
+                    Text(ui, c.Kicker, cx, y - 8 * U, 13 * U, A(Gold, a), 1, 0.36f); y += 22 * U;
+                    foreach (string line in c.Lines) y += Rich(line, cx - w / 2, y, 25 * U, w, 34 * U, A(Bone, a), A(Gold, a), true, 1);
+                }
+            }
+            if (t > 1.5f) Text(ui, hud.IsPad ? "A  SKIP" : "ENTER  SKIP", W - 0.05f * W, H - 0.06f * H - 14 * U, 12 * U, A(Bone, 0.55f), 2, 0.26f);
+        }
+
         void End(Hud hud)
         {
             Veil();
             EndStats s = hud.Stats; bool win = hud.Win;
             float w = 800 * U, h = 540 * U, x = (W - w) / 2, y = Panel(w, h), cx = W / 2, cy = y + 40 * U;
-            Text(ui, win ? "MISSION ACCOMPLISHED" : "MISSION FAILED", cx, cy, 13 * U, Gold, 1, 0.34f); cy += 30 * U;
-            Text(display, win ? "THE KREMLIN IS YOURS" : "MISSION FAILED", cx, cy, 48 * U, Bone, 1, 0.06f); cy += 66 * U;
-            Text(ui, win ? "Your standard flies over the Senate. The Third Rome has a new master." : "The legion still holds the Kremlin. Rome endures another day.", cx, cy, 18 * U, A(Bone, 0.82f), 1, 0.02f); cy += 44 * U;
+            Text(ui, win ? "LEVEL ZERO COMPLETE" : "LEVEL ZERO FAILED", cx, cy, 13 * U, Gold, 1, 0.34f); cy += 30 * U;
+            Text(display, win ? "THE KEYS ARE YOURS" : "MISSION FAILED", cx, cy, 48 * U, Bone, 1, 0.06f); cy += 66 * U;
+            Text(ui, win ? "The gates of the U-235 enrichment zone will open for you. Level One: go in, and break it from the inside." : "The garrison still holds the castle, and the keys with it.", cx, cy, 18 * U, A(Bone, 0.82f), 1, 0.02f); cy += 44 * U;
             Rect(x + 52 * U, cy, w - 104 * U, Math.Max(1, U), A(Gold, 0.2f)); cy += 24 * U;
             int acc = s.Shots > 0 ? (int)Math.Round(100f * s.Hits / s.Shots) : 0;
             int mm = (int)(s.Time / 60), ss = (int)(s.Time % 60);
             string[][] st =
             {
-                new[] { s.Kills + "/" + s.Total, "LEGIONARIES" }, new[] { acc + "%", "ACCURACY" }, new[] { s.Heads.ToString(), "HEADSHOTS" },
+                new[] { s.Kills + "/" + s.Total, "DEFENDERS" }, new[] { acc + "%", "ACCURACY" }, new[] { s.Heads.ToString(), "HEADSHOTS" },
                 new[] { (int)Math.Round(s.Longest) + " m", "LONGEST SHOT" }, new[] { mm + ":" + ss.ToString("00"), "TIME" }, new[] { s.Alarms.ToString(), "ALARMS RAISED" },
                 new[] { s.Charges.ToString(), "CHARGES USED" },
             };
@@ -418,7 +452,7 @@ namespace PaxRomana
             }
             cy += 150 * U;
             Rect(x + 52 * U, cy, w - 104 * U, Math.Max(1, U), A(Gold, 0.2f)); cy += 22 * U;
-            string rating = !win ? "—" : acc >= 85 && s.Alarms == 0 ? "UMBRA · GHOST OF THE MOSKVA" : acc >= 65 ? "SAGITTARIUS · MARKSMAN" : "TIRO · RECRUIT";
+            string rating = !win ? "—" : acc >= 85 && s.Alarms == 0 ? "CHHAYA · THE SHADOW" : acc >= 65 ? "NISHANEBAAZ · MARKSMAN" : "RANGROOT · RECRUIT";
             Text(display, rating, cx, cy, 15 * U, Gold, 1, 0.24f); cy += 40 * U;
             Button("DEPLOY AGAIN", cx, cy, true); cy += 62 * U;
             Text(ui, hud.IsPad ? "PRESS A" : "PRESS ENTER", cx, cy, 13 * U, A(Bone, 0.7f), 1, 0.26f);

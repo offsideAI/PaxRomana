@@ -1,28 +1,57 @@
-# PRD: Pax Romana: Tertia Roma, native C# edition for Xbox (MonoGame)
+# PRD: Pax Romana, Level Zero: The Keys. Native C# edition for Xbox (MonoGame)
 
 | | |
 | --- | --- |
-| Product | Pax Romana: Tertia Roma (Native) |
+| Product | Pax Romana, Level Zero: The Keys (app name on the console: Pax Romana: Tertia Roma (Native)) |
 | Source | `PaxRomana-XBOX-CSharp-src/` |
 | Platform | Xbox in Developer Mode (UWP, x64); also runs on macOS, Windows and Linux as a desktop build |
 | Technology | C# 7.3, MonoGame 3.8.1.303, no web view, no JavaScript, no asset files |
-| Document date | 2026-11-18 |
+| Document date | 2026-11-18, revised the same day for the Level Zero re-theme (see below) |
+| Branch | `develop` |
 | Status | Implemented and committed (3575a97). Rules tested and rendering checked on a Mac. The Xbox package builds on GitHub Actions. **Nothing has been installed or run on the console yet** (see [section 9](#9-status-and-acceptance)). |
 
 This document has two parts. Sections 1 to 9 are the product requirements: what the game is and how it must behave.
 Section 10 onwards is the developer documentation: how the code is organised and how to build, test, install and
 change it.
 
----
+## Revision: Level Zero
+
+What had been built (a winter Kremlin held by Roman legionaries, captured by raising a standard) is now **Level
+Zero** of the game, re-themed and given a new objective. **Where this section and a later section disagree, this
+section is right**; sections 1, 5.1 and 5.2 have been rewritten, and the tables in 5.5 to 5.9 still describe the
+rules correctly but may use the old names.
+
+| Was | Is now |
+| --- | --- |
+| Future Moscow, 2187, winter, snow falling | Bavaria, summer 1944: green meadow with flowers, leafy trees, blue sky, drifting seeds |
+| The Kremlin: red brick, green tented roofs, red stars, onion-domed cathedral, neon strips | Burg Adlerstein: limestone walls, slate witch-hat roofs, keep, armoury, chapel with a spire |
+| SPQR banners | The garrison's flag (red field, white disc, black emblem). `Config.HISTORICAL_INSIGNIA = false` swaps the emblem for a plain cross. |
+| Roman legionaries with shield and pilum; a centurion | German infantry in field grey with steel helmets, belt kit and slung rifles; an officer in a peaked cap |
+| Neon skyline of 85 towers and an orbital tether | The U-235 enrichment works on levelled ground at (450, −800): six process halls, a cascade building, five chimney stacks, two cooling towers, tanks, a walled perimeter. Scenery only, outside the playable valley. |
+| The player: a nameless sniper with a Gauss rifle | An agent of the Research and Analysis Wing with a scoped bolt-action rifle |
+| Objective: clear the walls, hold the courtyard flagpole for 8 s | Objective: clear the walls, enter the keep, open the vault, stand at the strongbox for 8 s to take the keys to the enrichment zone |
+| Doors: Spasskaya gate, Arsenal, cathedral, Senate, command vault | Doors: castle gate, armoury, chapel, keep, vault |
+| Starts straight from the title panel | A 27-second intro plays first, once per session: a "LEVEL ZERO · THE KEYS" title card and three briefing cards over a flight across the valley, the works and the castle. **A**, Menu or RT (Enter, Space, Esc or a click) skips it. |
+| End screen "THE KREMLIN IS YOURS", Latin ratings | "LEVEL ZERO COMPLETE · THE KEYS ARE YOURS", with a line pointing to Level One; ratings Chhaya, Nishanebaaz, Rangroot |
+| Parity with the web edition in setting and objective | The web edition is unchanged, so the two now differ in setting and objective. Rules, controls and haptics still match. |
+
+Unchanged: the map layout and coordinates, the 29 posts and patrol routes, alert rules, ballistics, kill-cam,
+explosive charges, door mechanics, controls, haptics, sound, architecture, build and deployment. The rules test now
+has 58 checks, including the intro (skipped, and played through) and the walk through the keep into the vault.
+
+Later levels (infiltrating and subverting the enrichment zone) are not designed or built.
 
 ## 1. Summary
 
-Pax Romana: Tertia Roma is a single-player, first-person sniper game. Rome never fell; in 2187 the legions of the
-Third Rome hold the Kremlin above a frozen, neon-lit Moscow. The player starts on a ridge across the Moskva river,
-clears the defenders inside the Kremlin walls and raises a standard at the flagpole in the courtyard.
+Pax Romana is a single-player, first-person sniper game. What exists is **Level Zero: The Keys**. Bavaria, summer
+1944: beyond the valley the Reich is enriching uranium-235 in a walled works, and the keys to that enrichment zone
+lie in a strongbox in the vault of Burg Adlerstein, a hill castle held by a garrison of 29. The player, an agent of
+the Research and Analysis Wing, starts on a ridge across the river, clears the defenders inside the castle walls,
+gets into the keep and takes the keys. Later levels are to use them to enter the enrichment zone and subvert it from
+the inside.
 
-This edition is a rewrite in C# of the Xbox game in `PaxRomana-XBOX-src/`, which is a Three.js game inside a UWP
-WebView2 wrapper. It keeps the same rules, controls and haptics and draws a simpler picture.
+This edition began as a rewrite in C# of the Xbox game in `PaxRomana-XBOX-src/`, which is a Three.js game inside a
+UWP WebView2 wrapper. It keeps that game's rules, controls and haptics and draws a simpler picture.
 
 ## 2. Background and problem
 
@@ -76,38 +105,41 @@ data collection: the app manifest declares no capabilities.
 | Stage | Objective text | Condition |
 | --- | --- | --- |
 | Title | Menu panel over a slow camera drift above the valley | Until **A** (or Enter / click) once loading has finished |
-| 0 | Breach the Kremlin: open the Spasskaya gate, or blow it in | Defenders alive inside the walls, player outside |
+| Intro | Title card "LEVEL ZERO · THE KEYS", then three briefing cards, letterboxed, over a scripted flight | First start of a session only. 27 s, or until skipped. The mission clock does not run. |
+| 0 | Breach the castle: open the gate, or blow it in | Defenders alive inside the walls, player outside |
 | 1 | Clear the defenders inside the walls: *n* left | Defenders alive inside the walls, player inside |
-| 2 | Raise your standard at the flagpole in the courtyard | No defenders inside the walls, player away from the flagpole |
-| 3 | Hold the flagpole | No defenders inside the walls, player at the flagpole |
-| 4 | The Kremlin is yours | Standard raised |
-| End | Statistics and rating, 3 s after the capture | **A** / Menu (or Enter / click) starts a new mission |
+| 2 | Take the keys from the vault in the keep | No defenders inside the walls, player away from the strongbox |
+| 3 | Stay at the strongbox | No defenders inside the walls, player at the strongbox |
+| 4 | You have the keys to the enrichment zone | Strongbox cracked |
+| End | Statistics and rating, 3 s after the keys are taken | **A** / Menu (or Enter / click) starts a new mission |
 
-- "Inside the walls" means |x| < 48.5 m and |z| < 41.5 m around the Kremlin's centre. Only those defenders block the
-  capture; the camp, road, bridge and watchtower garrison do not have to be killed.
-- The flagpole is at (0, 15). The player must stand within 7 m of it on the plateau for **8 seconds**. Progress drains
-  over 14 s when the player steps away. While a defender is alive inside the walls the bar shows "Contested: *n*
-  defenders inside the walls" and does not fill.
+- "Inside the walls" means |x| < 48.5 m and |z| < 41.5 m around the castle's centre. Only those defenders block the
+  objective; the camp, road, bridge and watchtower garrison do not have to be killed.
+- The strongbox stands on a plinth in the vault, the back room of the keep's ground floor. The player must stand
+  within 2.3 m of the marker ring at (0, −14.2) for **8 seconds**. Getting there means passing the keep door and the
+  iron vault door, each opened with **A** or blown in with a charge. Progress drains over 14 s when the player steps
+  away. While a defender is alive inside the walls the bar shows "Contested: *n* defenders inside the walls" and does
+  not fill.
 - When two or fewer defenders remain inside, a hint says where they are (in the courtyard, on the wall-walk, on the
-  gate tower, inside the Senate, on the Senate roof).
+  gate tower, inside the keep, on the keep roof).
 - Pausing (Menu / Esc) freezes the mission and shows the same panel with a Resume button. Losing focus pauses too.
-- A new mission restores the doors, the flag, the garrison and the ammunition. The world itself is built once.
+- A new mission restores the doors, the strongbox, the garrison and the ammunition. The world itself is built once.
 
 ### 5.2 World
 
-All coordinates are metres; +Y is up; the Kremlin is at the origin; the water surface is y = 0.
+All coordinates are metres; +Y is up; the castle is at the origin; the water surface is y = 0.
 
 | Feature | Requirement |
 | --- | --- |
-| Valley | 1,200 m square playable heightfield (3 m cells) with a coarse outer ring to the horizon. Snow, slush on the roads and bare rock on slopes. |
-| Kremlin | Plateau at 30 m. Red brick curtain walls 13 m high with wall-walks, corner and mid-wall towers with red stars, the Spasskaya gatehouse, the Senate (with a command vault), the Arsenal, a cathedral with gold onion domes, courtyard furnishings, banners lettered SPQR. |
-| Doors | Five, each openable by hand or destroyed by a charge: the Spasskaya gate (two leaves), the Arsenal door, the cathedral door, the Senate door, the command vault door (iron). |
-| River and bridge | The Moskva runs east to west at about z = 210. A stone bridge crosses it at x = 55, z = 180 to 260, deck at 3.4 m. |
-| Camp | The legion's forward base at (170, 10): palisade ring of radius 52 m with a south gateway, tents, fires, a watchtower. |
+| Valley | 1,200 m square playable heightfield (3 m cells) with a coarse outer ring to the horizon. Summer meadow, bare earth on the roads and in the yards, rock on slopes and summits. |
+| Burg Adlerstein | Rock plateau at 30 m. Limestone curtain walls 13 m high with wall-walks, round corner and mid-wall towers with slate witch-hat roofs, a twin-towered gatehouse, the keep (with the vault on its ground floor), the armoury, a chapel with a bell tower and spire, courtyard furnishings, a flagpole, flags and hanging banners. |
+| Doors | Five, each openable by hand or destroyed by a charge: the castle gate (two leaves), the armoury door, the chapel door, the keep door, the vault door (iron). |
+| River and bridge | The river runs east to west at about z = 210. A stone bridge crosses it at x = 55, z = 180 to 260, deck at 3.4 m. |
+| Camp | The garrison's camp at (170, 10): stockade ring of radius 52 m with a south gateway, field-grey tents, fires, a flagpole, a watchtower. |
 | Sniper's nest | Spawn at (120, 412) beside a ruined wall, about 390 m from the gate. |
-| Skyline | 85 towers of a future Moscow with lit windows and red beacons, and an orbital tether. Scenery only. |
-| Vegetation | Three tree species (about 1,150 in the valley, 1,500 beyond it), 420 boulders, frosted grass around the player. Trees and boulders block movement. |
-| Sky and weather | Low winter sun, sky dome, drifting cloud deck, violet distance haze, falling snow around the camera, two flocks of birds, chimney and campfire smoke. |
+| Enrichment works | At (450, −800), about 1,250 m from the nest and visible from it to the right of the castle. Scenery only in this level. |
+| Vegetation | Three tree species in summer leaf (about 1,150 in the valley, 1,500 beyond it), 420 boulders, meadow grass with poppies, daisies and buttercups around the player. Trees and boulders block movement. |
+| Sky and weather | High summer sun, blue sky dome, fair-weather cloud, pale distance haze, seeds drifting around the camera, two flocks of birds, chimney and campfire smoke. |
 
 The world is laid out by a seeded generator, so it is identical on every run and on every platform.
 
@@ -163,20 +195,20 @@ The world is laid out by a seeded generator, so it is identical on every run and
 
 ### 5.5 Garrison
 
-29 soldiers: 28 legionaries and one centurion (red cloak, transverse crest).
+29 soldiers: 28 infantrymen and one officer (peaked cap, holster, silver shoulder straps).
 
 | Post | Count | Behaviour |
 | --- | --- | --- |
 | South and north wall-walks | 5 | Patrol back and forth |
 | Foot of the south wall, camp road | 2 | Patrol |
 | Gatehouse roof and gate, ground level | 4 | Stand still until alerted |
-| Senate roof | 2 | Walk a loop |
+| Keep roof | 2 | Walk a loop |
 | Road patrol | 2 | Walk as a pair |
 | Bridge | 1 | Patrol the deck |
-| Drill squad around the camp | 7 | Centurion leading six legionaries in a loop |
+| Drill section around the camp | 7 | The officer leading six soldiers in a loop |
 | Watchtower | 1 | Lookout, stands still |
 | Camp | 3 | Two by the fire, one walking |
-| Courtyard and Senate vault | 2 | One crossing the courtyard, one guarding the vault |
+| Courtyard and keep | 2 | One crossing the courtyard, one guarding the vault door inside the keep |
 
 **Alert.** The garrison has an alert level from 0 to 100, shown as a bar under the objective. It falls by 1.6 per
 second when nothing happens.
@@ -213,9 +245,9 @@ at 720 lines and scale with the screen height.
 | Element | Position | Content |
 | --- | --- | --- |
 | Objective | Top left | Objective text, kills / total "LEGIONARIES DOWN", alert bar (flashes "ALARM" during an alarm) |
-| Capture bar | Top centre | Progress and "Raising your standard *n*%", "Contested: …" or "Kremlin captured" |
+| Progress bar | Top centre | Progress and "Cracking the strongbox *n*%", "Contested: …" or "You have the keys" |
 | Feed | Top right | Last five events, each for about 5 s: kills with range, HEADSHOT, Blast *n* DOWN, BREACH, SPOTTED, ALARM, WALLS CLEAR |
-| Door prompt | Lower centre | Key cap (A or O) and "Open / Close the Spasskaya gate" when a door is in reach |
+| Door prompt | Lower centre | Key cap (A or O) and "Open / Close the castle gate" when a door is in reach |
 | Hint | Lower centre | Timed messages, upper case |
 | Crosshair, hit marker | Centre | Crosshair at the hip; a four-tick marker on a kill, red for a headshot |
 | Ammunition | Bottom right | Magazine and reserve, five round pips, eight charge pips, stance, status (RELOADING, PRESS X TO RELOAD, NO AMMUNITION) |
@@ -224,8 +256,8 @@ at 720 lines and scale with the screen height.
 | End screen | Centre | Kills, accuracy, headshots, longest shot, time, alarms raised, charges used, rating, "DEPLOY AGAIN" |
 
 - Prompts follow the last input device used. On the console they are controller prompts from the first frame.
-- Ratings on a win: **Umbra · Ghost of the Moskva** (accuracy at least 85% and no alarm), **Sagittarius · Marksman**
-  (accuracy at least 65%), otherwise **Tiro · Recruit**.
+- Ratings on a win: **Chhaya · The Shadow** (accuracy at least 85% and no alarm), **Nishanebaaz · Marksman**
+  (accuracy at least 65%), otherwise **Rangroot · Recruit**.
 - The first hint, 1.2 s after the mission starts, lists the main controls.
 
 ### 5.8 Controls
@@ -280,8 +312,8 @@ the triggers. Strengths are 0 to 1.
 | Spotted by a sentry | 0.4 | 0.2 | | | 180 ms | Fades out |
 | Alarm | 0.35 | | | | 500 ms × 2 | 700 ms apart, fading out |
 | Walls clear | 0.5 | 0.5 | | | 260 ms | Fades out |
-| Raising the standard | | 0.12 rising to 0.42 | | | 45 ms | Every 0.5 s |
-| Kremlin captured | 0.9 | 0.9 | 0.5 | 0.5 | 900 ms | Fades out |
+| Cracking the strongbox | | 0.12 rising to 0.42 | | | 45 ms | Every 0.5 s |
+| Keys taken | 0.9 | 0.9 | 0.5 | 0.5 | 900 ms | Fades out |
 
 Rumble stops when the game is paused, loses focus, ends or exits.
 
@@ -294,9 +326,8 @@ time sound takes to travel. Sound is mono. If the device has no audio output the
 
 ### 5.11 Start-up, loading and errors
 
-- The title panel appears at once with a loading bar and six progress messages ("Firing Kremlin brick…", "Laying snow
-  over the Moskva valley…", "Raising the Kremlin and the skyline…", "Frosting the birch and pine…", "Mustering the
-  legion…", "Polishing the lens…"). The world and the sound are built on a background thread.
+- The title panel appears at once with a loading bar and six progress messages ("Quarrying castle stone…", "Growing summer grass along the river…", "Raising Burg Adlerstein and the
+  enrichment works…", "Leafing the birch and pine…", "Posting the garrison…", "Polishing the lens…"). The world and the sound are built on a background thread.
 - The button reads LOADING… until the world is ready, then TAKE THE SHOT.
 - **Error screen.** If loading, a game frame or a draw call throws, the game shows "The game hit an error and had to
   stop. Please pass on the text below." followed by the first 1,100 characters of the error. On a console an unhandled
@@ -322,7 +353,7 @@ time sound takes to travel. Sound is mono. If the device has no audio output the
 
 ### The same
 
-The valley and the Kremlin and its rooms; the 29-soldier garrison, its routes and its alert rules; free roam with
+The layout of the valley, the fortress and its rooms; the 29-soldier garrison, its routes and its alert rules; free roam with
 collision, wading, swimming and the bridge; ballistics with drop, wind and sight zero; the rangefinder; the kill-cam;
 explosive charges and breaching; the five doors; the capture; every HUD element, menu and end-screen statistic; the
 controller layout; aim friction; every haptic cue; the keyboard and mouse controls.
@@ -365,11 +396,11 @@ workflow that runs the test before it builds the package.
 
 | Check | Result |
 | --- | --- |
-| Headless rules test (`tests/`), 46 checks | Passes. Last run 2026-11-18. Earlier in development it passed 52 consecutive runs after the last rule fix. |
+| Headless rules test (`tests/`), 58 checks | Passes. Last run 2026-11-18 after the Level Zero re-theme, eight times in a row. |
 | Shared code compiles against .NET Standard 2.0 and C# 7.3 (`tools/apicheck`) | Passes |
 | Shared code compiles against the real `MonoGame.Framework.WindowsUniversal` 3.8.1.303 assembly | Passed, in a scratch project on the Mac |
-| GitHub Actions workflow: rules test on Windows, UWP project and `Program.cs` compile with .NET Native, package signed and uploaded | Passed on the first run, 2026-11-18 (run 44402866842, commit 3575a97) |
-| Rendering on the desktop build | 18 scripted views inspected on a Mac: title, nest, low sun, scope, 16× on a guard, kill-cam in flight and on impact, gate breach, courtyard, explosion, smoke, camp and skyline, controls overlay, end screen; and the error screen |
+| GitHub Actions workflow: rules test on Windows, UWP project and `Program.cs` compile with .NET Native, package signed and uploaded | Passed on the first run, 2026-11-18 (run 44402866842, commit 3575a97). That was the build before the Level Zero re-theme; the re-themed code has not been through the workflow yet. |
+| Rendering on the desktop build | 26 scripted views of Level Zero rendered on a Mac, about half of them inspected (title, intro cards, nest, soldiers, scope, courtyard, vault, works). Before the re-theme: title, nest, low sun, scope, 16× on a guard, kill-cam in flight and on impact, gate breach, courtyard, explosion, smoke, camp and skyline, controls overlay, end screen; and the error screen |
 
 ### Not verified
 
@@ -387,7 +418,7 @@ workflow that runs the test before it builds the package.
 3. The game starts to the title panel with no WebView2 message, finishes loading, and **A** starts the mission.
 4. The picture fills the screen and no HUD text is cut off at the edges.
 5. The mission can be completed with the controller alone: scope, kill at range, breach the gate with a charge, clear
-   the walls, hold the flagpole, reach the end screen, deploy again.
+   the walls, open the keep and the vault, stay at the strongbox, reach the end screen, deploy again.
 6. Vibration is felt for a shot (including the right trigger), an explosion and the capture.
 7. Sound plays: shot, explosion, klaxon, wind.
 8. The frame rate is smooth while turning in the courtyard and looking across the valley through the scope.
@@ -444,11 +475,11 @@ them with no project edits.
 | `Textures.cs` | 510 | `Tex` (CPU image), `Canvas` (2D drawing), `FontFace` (decodes the baked fonts), `Textures.Make` (every texture) |
 | `FontData.g.cs` | 40 | Generated. Three font atlases, gzipped and base64-encoded |
 | `Terrain.cs` | 177 | `HeightAt`, `MacroAt`, `GroundAt`; builds 16 inner tiles and the outer ring |
-| `Castle.cs` | 498 | `Builder` (geometry per material), `Castle` (Kremlin, camp, bridge, ruined wall, doors, banners, flagpole), `City` (skyline, tether) |
+| `Castle.cs` | 498 | `Builder` (geometry per material), `Castle` (Burg Adlerstein, camp, bridge, ruined wall, doors, banners, flagpole), `Works` (the enrichment works) |
 | `Vegetation.cs` | 369 | `Lighting` (the light rig), trees and boulders baked into chunks, `Grass` |
 | `Colliders.cs` | 155 | Bounding-volume hierarchy over the masonry triangles, plus door leaves; `Raycast`, `Blocked` |
 | `Input.cs` | 121 | `Btn`, `Pad` (controller state and the haptics mixer), `K`, `KeyMouse`, `IAudio`, `NullAudio` |
-| `Garrison.cs` | 386 | `Route`, `Soldier` (patrol, alert, animation, hit volumes, geometry), `Legion` (the 29 posts, alert level, alarm) |
+| `Garrison.cs` | 386 | `Route`, `Soldier` (patrol, alert, animation, hit volumes, geometry), `Garrison` (the 29 posts, alert level, alarm) |
 | `Player.cs` | 215 | `Camera`, `Player` (movement, collision, water, bridge, breath, sway) |
 | `Weapon.cs` | 276 | `Bullet`, `Weapon` (firing, ballistics, prediction, reload, view-model pose and geometry) |
 | `Effects.cs` | 175 | `Fx`: particles, snow, birds, shockwaves, explosion flash |
@@ -519,7 +550,7 @@ multiplied by the kill-cam time scale, zero when paused) drives projectiles, sol
 triangles, 1,668 solids, 17 terrain tiles, 77 near and 38 far vegetation chunks and 5 doors.
 
 - **Textures** (`Textures.Make`): brick 512, slate, snow, rock, timber, leather, water and cloud 256, bark 128, a
-  1024 × 256 leaf atlas, the SPQR banner, a window facade for the skyline, soft and glow discs, a 1024 scope mask, a
+  1024 × 256 leaf atlas, the garrison's flag, a factory wall for the enrichment works, soft and glow discs, a 1024 scope mask, a
   vignette. Images are mip-mapped with an alpha-weighted box filter so cut-out foliage does not get dark fringes.
 - **Terrain**: `Terrain.GroundAt(x, z)` is the single source of ground height for everything (player, soldiers,
   bullets, trees). The inner 1,200 m square is 400 × 400 cells split into 16 tiles so each fits 16-bit indices.
@@ -530,7 +561,7 @@ triangles, 1,668 solids, 17 terrain tiles, 77 near and 38 far vegetation chunks 
 - **Solids**: every wall, tower, building, tent, tree and boulder adds a `Solid` (box, circle, or a ring with a
   gateway) to `World.Solids`. `Collision.Resolve` pushes the player out of them. A door owns a `Solid` that is
   switched off while the door is open or broken.
-- **Vegetation**: trees and boulders are merged into chunk meshes on a 150 m grid near the Kremlin and a 700 m grid
+- **Vegetation**: trees and boulders are merged into chunk meshes on a 150 m grid near the castle and a 700 m grid
   beyond, where trees use lighter variants. Leaf lighting is baked into vertex colours with `Lighting.Bake`.
 - **Grass**: a 7 × 7 window of 24 m cells follows the player. When the player crosses a cell boundary, at most one
   stale cell is refilled per frame, nearest first, so there is no hitch.
@@ -610,7 +641,7 @@ All commands below run from `PaxRomana-XBOX-CSharp-src/`.
 | … full screen | `dotnet run -c Release -- --fullscreen` |
 | … as on the console (controller prompts, no mouse) | `dotnet run -c Release -- --console` |
 | … without sound | `dotnet run -c Release -- --mute` |
-| Render the 18 check views to PNG and quit | `cd desktop && dotnet run -c Release -- --shots out` |
+| Render the 26 check views to PNG and quit | `cd desktop && dotnet run -c Release -- --shots out` |
 | Rules test | `cd tests && dotnet run -c Release` |
 | Check the code against the console's limits | `dotnet build tools/apicheck` |
 | Rebuild the fonts | `python3 tools/makefont.py` (needs Pillow) |
@@ -632,7 +663,7 @@ through the same `Pad` and `KeyMouse` the shell fills. It prints one line per ch
 Two hooks exist for tests and the screenshot mode: `Player.AlwaysSteady` removes scope sway and
 `GameSim.AlwaysKillCam` forces the kill-cam on every eligible shot.
 
-**The screenshot mode** (`--shots`) poses the camera in 18 places on a timed script, saves 1280 × 720 PNG files,
+**The screenshot mode** (`--shots`) poses the camera in 26 places on a timed script, saves 1280 × 720 PNG files,
 prints average update and draw times, and exits by itself. It is the way to check rendering changes without playing.
 
 ### 10.11 Building for Xbox
@@ -702,10 +733,10 @@ Launch **Pax Romana: Tertia Roma (Native)** from Dev Home. Switching the app's t
 
 | To | Do this |
 | --- | --- |
-| Tune a rule | Constants sit at the top of the class that uses them: `Config` (world, ballistics), `Player` (speeds, eye heights, sway), `Weapon` (zoom, zero, magazine), `Capture.HOLD`, `GameSim.BLAST`, `Legion.AlertAround` call sites (alert amounts). Add or adjust a check in `tests/Tests.cs`. |
+| Tune a rule | Constants sit at the top of the class that uses them: `Config` (world, ballistics), `Player` (speeds, eye heights, sway), `Weapon` (zoom, zero, magazine), `Capture.HOLD`, `GameSim.BLAST`, `Garrison.AlertAround` call sites (alert amounts). Add or adjust a check in `tests/Tests.cs`. |
 | Add a haptic cue | Call `Pad.Rumble(...)` where the event happens. Rifle and charge cues are in the `GameSim` constructor; capture cues in `Capture.Update`. |
 | Add a sound | Synthesise a clip in `Synth.RenderAll`, add a method to `IAudio`, implement it in `SynthAudio` and `NullAudio`, and update the expected clip count in the test. |
-| Add a soldier or a patrol | Add an `Add(new Route(...), ...)` line in the `Legion` constructor. `Total` follows automatically. |
+| Add a soldier or a patrol | Add an `Add(new Route(...), ...)` line in the `Garrison` constructor. `Total` follows automatically. |
 | Add a door | Call `AddDoor` in `Castle` with its footprint and leaves. Collision, the prompt, breaching and drawing follow. |
 | Add a building or prop | Use `Builder.Box`, `Cyl`, `Prism` or `Add` in `Castle` under an existing material key, and add a `Solid` if it should block the player. A new material key needs an entry in the `mats` dictionary in `Renderer.SetWorld`, and in `Castle.ColliderKeys` if bullets should hit it. |
 | Add a texture | Add a `Make…` method and a field in `Textures`, upload it in `Renderer.SetWorld`. |

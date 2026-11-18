@@ -1,4 +1,4 @@
-// What a bullet can hit: the masonry and timber of the Kremlin and the camp (a bounding-volume hierarchy over their
+// What a bullet can hit: the masonry and timber of the castle and the camp (a bounding-volume hierarchy over their
 // triangles) and the door leaves, which move.
 using System;
 using System.Collections.Generic;

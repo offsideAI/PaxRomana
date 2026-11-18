@@ -1,4 +1,4 @@
-// Frosted grass that follows the player, three tree species and boulders. Trees and boulders are baked into
+// Summer meadow grass that follows the player, three tree species and boulders. Trees and boulders are baked into
 // static chunks (no instancing needed); foliage lighting is baked into vertex colours.
 using System;
 using System.Collections.Generic;
@@ -10,13 +10,13 @@ namespace PaxRomana
     // The light rig, shared by the renderer and by anything that bakes lighting into vertex colours.
     public static class Lighting
     {
-        public static readonly Vector3 Sun = new Vector3(1.0f, 0.74f, 0.50f) * 0.95f;      // low winter sun
-        public static readonly Vector3 Sky = new Vector3(0.26f, 0.32f, 0.46f);            // from straight above
-        public static readonly Vector3 Bounce = new Vector3(0.15f, 0.16f, 0.22f);         // off the snow, from the far side
-        public static readonly Vector3 Ambient = new Vector3(0.30f, 0.33f, 0.43f);
-        public static readonly Vector3 BounceFrom = Vector3.Normalize(new Vector3(0.76f, -0.4f, -0.46f));
-        public static readonly Vector3 Fog = M.Hex(0xb7b4c8);                             // cold violet haze
-        public const float FogStart = 60, FogEnd = 3300;
+        public static readonly Vector3 Sun = new Vector3(0.94f, 0.88f, 0.76f);            // high summer sun
+        public static readonly Vector3 Sky = new Vector3(0.20f, 0.27f, 0.40f);            // from straight above
+        public static readonly Vector3 Bounce = new Vector3(0.11f, 0.14f, 0.08f);         // off the grass, from the far side
+        public static readonly Vector3 Ambient = new Vector3(0.27f, 0.30f, 0.36f);
+        public static readonly Vector3 BounceFrom = Vector3.Normalize(new Vector3(0.52f, -0.4f, -0.50f));
+        public static readonly Vector3 Fog = M.Hex(0xbfd2e4);                             // pale summer haze
+        public const float FogStart = 90, FogEnd = 3900;
 
         public static Vector3 Bake(Vector3 n)
         {
@@ -90,24 +90,26 @@ namespace PaxRomana
                 float x = (cx + rng.Next()) * GC, z = (cz + rng.Next()) * GC, r1 = rng.Next(), r2 = rng.Next(), r3 = rng.Next(), r4 = rng.Next(), r5 = rng.Next(), r6 = rng.Next();
                 float h = Terrain.GroundAt(x, z);
                 if (h < 1.0f) continue;                                                                   // river bed and shore
-                if (Math.Abs(x) < 64 && Math.Abs(z) < 64 && M.Hypot(x, z) < 60) continue;                 // Kremlin rock
+                if (Math.Abs(x) < 64 && Math.Abs(z) < 64 && M.Hypot(x, z) < 60) continue;                 // castle rock
                 if (M.Hypot(x - Config.CAMP_X, z - Config.CAMP_Z) < Config.CAMP_R + 5) continue;          // trampled camp
                 if (M.Hypot((Terrain.GroundAt(x + 0.8f, z) - h) / 0.8f, (Terrain.GroundAt(x, z + 0.8f) - h) / 0.8f) > 0.6f) continue;   // bare rock
                 if (x > -10 && x < 185 && z > 30 && z < 310 && (M.DistToPath(x, z, Config.ROAD) < 3 || M.DistToPath(x, z, Config.ROAD2) < 3)) continue;
                 float patch = Noise.Fbm(x * 0.09, z * 0.09, 2, 77);
                 float yaw = r1 * M.TAU, cs = M.Cos(yaw), sn = M.Sin(yaw);
-                float sx = 1 + r2 * 0.8f, sy = (0.24f + r3 * 0.3f) * (0.6f + patch * 1.2f), sz = 1 + r4 * 0.8f;
+                float sx = 1 + r2 * 0.8f, sy = (0.30f + r3 * 0.38f) * (0.6f + patch * 1.2f), sz = 1 + r4 * 0.8f;
                 float t = M.Smoothstep(0.3f, 0.7f, Terrain.MacroAt(x, z)), k = (0.8f + r5 * 0.45f) * 0.9f;
-                float cr = 0.7f * M.Lerp(1.22f, 0.74f, t) * k, cg = 0.74f * M.Lerp(1.04f, 1.0f, t) * k, cb = 0.66f * M.Lerp(0.66f, 0.78f, t) * k;
-                if (r6 < 0.05f) { cr = 0.42f * k; cg = 0.36f * k; cb = 0.12f * k; }      // dry straw
+                float cr = 0.35f * M.Lerp(1.22f, 0.80f, t) * k, cg = 0.45f * M.Lerp(1.04f, 1.0f, t) * k, cb = 0.19f * M.Lerp(0.72f, 0.86f, t) * k;
+                if (r6 < 0.05f) { cr = 0.62f * k; cg = 0.55f * k; cb = 0.26f * k; }      // dry straw
+                // a few tufts carry a flower head: poppy, daisy or buttercup
+                Vector3 bloom = r6 > 0.93f ? (r6 > 0.975f ? new Vector3(0.86f, 0.12f, 0.08f) : r6 > 0.95f ? new Vector3(0.95f, 0.94f, 0.88f) : new Vector3(0.95f, 0.80f, 0.14f)) : Vector3.Zero;
                 for (int v = 0; v < TuftVerts; v++)
                 {
                     Vector3 p = Tuft[v];
-                    // dark at the root, rimed white towards the tip
-                    float px = p.X * sx, pz = p.Z * sz, shade = M.Lerp(0.5f, 1.15f, p.Y), frost = 0.35f + 0.5f * p.Y;
-                    cell.V[n * TuftVerts + v] = new VertexPositionColor(
-                        new Vector3(x + px * cs + pz * sn, h - 0.03f + p.Y * sy, z - px * sn + pz * cs),
-                        M.Col(M.Lerp(cr * shade, 0.80f, frost), M.Lerp(cg * shade, 0.85f, frost), M.Lerp(cb * shade, 0.93f, frost)));
+                    // dark at the root, sunlit towards the tip
+                    float px = p.X * sx, pz = p.Z * sz, shade = M.Lerp(0.55f, 1.25f, p.Y), tip = 0.25f * p.Y;
+                    Color col = M.Col(M.Lerp(cr * shade, 0.58f, tip), M.Lerp(cg * shade, 0.62f, tip), M.Lerp(cb * shade, 0.28f, tip));
+                    if (bloom.X > 0 && v == 4) col = M.Col(bloom.X, bloom.Y, bloom.Z);
+                    cell.V[n * TuftVerts + v] = new VertexPositionColor(new Vector3(x + px * cs + pz * sn, h - 0.03f + p.Y * sy, z - px * sn + pz * cs), col);
                 }
                 n++; lo = Math.Min(lo, h); hi = Math.Max(hi, h);
             }
@@ -209,7 +211,7 @@ namespace PaxRomana
                 centres.Add(new Vector3(0, 8.6f, 0));
                 sp.Leaf = Cards(rng, centres, 8, 2.7f, 2.2f, new Vector3(0, 6.5f, 0), 1, 0);
                 sp.LiteLeaf = Cards(rng, centres, 2, 3.9f, 2.2f, new Vector3(0, 6.5f, 0), 1, 0);
-                sp.Tint = M.Hex(0xd9e2ee);
+                sp.Tint = new Vector3(1.18f, 1.22f, 0.98f);
             }
             else if (kind == 1)     // umbrella pine
             {
@@ -225,7 +227,7 @@ namespace PaxRomana
                 }
                 sp.Leaf = Cards(rng, centres, 7, 2.5f, 1.9f, new Vector3(0.2f, 9.8f, 0), 0.4f, 1);
                 sp.LiteLeaf = Cards(rng, centres, 2, 3.6f, 1.9f, new Vector3(0.2f, 9.8f, 0), 0.4f, 1);
-                sp.Tint = M.Hex(0x9fb9b0);
+                sp.Tint = new Vector3(0.92f, 1.04f, 0.86f);
             }
             else                    // cypress / spruce column
             {
@@ -237,7 +239,7 @@ namespace PaxRomana
                     sp.Leaf.Add(Cards(rng, new List<Vector3> { c }, 5, 1.9f - i * 0.09f, 1.5f - i * 0.1f, new Vector3(0, c.Y - 1.5f, 0), 0.8f, 2));
                 }
                 sp.LiteTrunk = trunk; sp.LiteLeaf = sp.Leaf;
-                sp.Tint = M.Hex(0x8fa8a2);
+                sp.Tint = new Vector3(0.84f, 0.98f, 0.82f);
             }
             sp.Trunk = trunk;
             return sp;
@@ -330,6 +332,8 @@ namespace PaxRomana
                 float a = rng.Next() * M.TAU, r = 620 + rng.Next() * 1500, x = 60 + M.Cos(a) * r, z = 190 + M.Sin(a) * r;
                 if (x > X0 && x < X0 + SZ && z > Z0 && z < Z0 + SZ) continue;
                 if (Noise.Fbm(x * 0.004, z * 0.004, 2, 45) < 0.45f || Terrain.HeightAt(x, z) < 3) continue;
+                // no trees in the works yard; drawing the same three numbers a tree would keeps every later tree and boulder where it was
+                if (M.Hypot(x - Config.WORKS_X, z - Config.WORKS_Z) < 300) { rng.Next(); rng.Next(); rng.Next(); continue; }
                 Place(rng.Next() < 0.7f ? 0 : 1, x, z, 1.2f + rng.Next() * 0.9f, false);
             }
 

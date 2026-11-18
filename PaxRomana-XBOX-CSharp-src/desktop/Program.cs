@@ -65,23 +65,31 @@ namespace PaxRomana
             switch (step)
             {
                 case 0: wait = 0.5f; break;                                                            // title screen
-                case 1: s.Begin(true); s.Hud.HintT = 0; wait = 0.67f; break;                            // the nest, rifle at the hip
-                case 2: Aim(nest + new Vector3(Config.SUN_DIR.X, 0.02f, Config.SUN_DIR.Z) * 500); wait = 0.5f; break;   // towards the low sun
-                case 3: Aim(new Vector3(0, 48, 0)); s.Weapon.WantAds = true; wait = 0.83f; break;       // through the scope at the Kremlin
-                case 4: s.Weapon.ZoomI = 4; Aim(s.Legion.Soldiers[9].Pos + new Vector3(0, 1.25f, 0)); s.AlwaysKillCam = true; s.Player.AlwaysSteady = true; wait = 0.5f; break;   // 16x on a gate guard
-                case 5: s.Trigger(); wait = 0.5f; break;                                                // kill-cam: the round in flight
-                case 6: wait = 5.9f; break;                                                            // ... arriving
-                case 7: wait = 4.33f; break;                                                            // ... and back behind the scope
-                case 8: Aim(new Vector3(1, 33, 39.8f)); wait = 0.17f; break;
-                case 9: s.TriggerExplosive(); wait = 0.48f; break;                                       // a charge landing on the gate
-                case 10: s.Weapon.WantAds = false; Teleport(0, 58, 0, 0.12f); wait = 0.67f; break;       // below the breached gate
-                case 11: Teleport(-14, 20, -1.2f, 0.25f); wait = 0.67f; break;                           // courtyard: Senate, cathedral, flagpole
-                case 12: Teleport(-8, 4, 0.75f, 0.0f); wait = 0.6f; break;
-                case 13: s.TriggerExplosive(); wait = 0.15f; break;                                       // an explosion close by
-                case 14: wait = 0.75f; break;                                                            // its smoke
-                case 15: Teleport(120, 80, 0.9f, 0.05f); wait = 0.67f; break;                            // the road, camp and skyline
-                case 16: Teleport(60, 170, 0.1f, 0.0f); s.Hud.ToggleKeys(); wait = 0.5f; break;          // by the bridge, with the controls overlay
-                case 17: s.Hud.ToggleKeys(); s.Hud.End(true, new EndStats { Kills = 21, Total = 29, Shots = 30, Hits = 24, Heads = 9, Longest = 412, Time = 754, Alarms = 1, Charges = 5 }); wait = 0.33f; break;
+                case 1: s.Begin(true); wait = 3.0f; break;                                              // intro: the Level Zero title card
+                case 2: wait = 7.0f; break;                                                            // ... the enrichment works
+                case 3: wait = 6.6f; break;                                                            // ... the keep
+                case 4: wait = 6.4f; break;                                                            // ... the orders
+                case 5: s.EndIntro(); s.Hud.HintT = 0; wait = 0.67f; break;                             // the nest, rifle at the hip
+                case 6: Near(s.Garrison.Soldiers[24], 2.6f, 0.9f); wait = 0.3f; break;                  // a soldier by the camp fire, close up
+                case 7: Near(s.Garrison.Soldiers[16], 3.4f, -1.6f); wait = 0.3f; break;                 // the officer and his section
+                case 8: Teleport(Config.SPAWN_X, Config.SPAWN_Z, 0, 0); Aim(new Vector3(Config.WORKS_X, 40, Config.WORKS_Z)); wait = 0.5f; break;   // the works from the nest
+                case 9: Aim(new Vector3(0, 48, 0)); s.Weapon.WantAds = true; wait = 0.83f; break;       // through the scope at the castle
+                case 10: s.Weapon.ZoomI = 4; Aim(s.Garrison.Soldiers[9].Pos + new Vector3(0, 1.25f, 0)); s.AlwaysKillCam = true; s.Player.AlwaysSteady = true; wait = 0.5f; break;   // 16x on a gate guard
+                case 11: s.Trigger(); wait = 0.5f; break;                                               // kill-cam: the round in flight
+                case 12: wait = 5.9f; break;                                                           // ... arriving
+                case 13: wait = 4.33f; break;                                                           // ... and back behind the scope
+                case 14: Aim(new Vector3(1, 33, 39.8f)); wait = 0.17f; break;
+                case 15: s.TriggerExplosive(); wait = 0.48f; break;                                      // a charge landing on the gate
+                case 16: s.Weapon.WantAds = false; Teleport(0, 58, 0, 0.12f); wait = 0.67f; break;       // below the breached gate
+                case 17: Teleport(-14, 22, -1.2f, 0.25f); wait = 0.67f; break;                           // courtyard: keep, chapel, flagpole
+                case 18: foreach (Door d in World.Castle.Doors) d.Want = 1; Teleport(0, -11.2f, 0, -0.28f); wait = 1.0f; break;   // in the vault, at the strongbox
+                case 19: Teleport(-8, 4, 0.75f, 0.0f); wait = 0.6f; break;
+                case 20: s.TriggerExplosive(); wait = 0.15f; break;                                       // an explosion close by
+                case 21: wait = 0.75f; break;                                                            // its smoke
+                case 22: Teleport(120, 80, 0.9f, 0.05f); wait = 0.67f; break;                            // the road and the camp
+                case 23: Teleport(430, -385, 0, 0.02f); Aim(new Vector3(Config.WORKS_X, 45, Config.WORKS_Z)); wait = 0.5f; break;   // the works from the edge of the valley
+                case 24: Teleport(60, 170, 0.1f, 0.0f); s.Hud.ToggleKeys(); wait = 0.5f; break;          // by the bridge, with the controls overlay
+                case 25: s.Hud.ToggleKeys(); s.Hud.End(true, new EndStats { Kills = 21, Total = 29, Shots = 30, Hits = 24, Heads = 9, Longest = 412, Time = 754, Alarms = 1, Charges = 5 }); wait = 0.33f; break;
                 default:
                     Console.WriteLine("average per frame: update " + (updateMs / frames).ToString("0.00") + " ms, draw " + (drawMs / frames).ToString("0.00") + " ms over " + frames + " frames");
                     Exit(); return;
@@ -93,6 +101,14 @@ namespace PaxRomana
         {
             Vector3 eye = Sim.Player.Pos + new Vector3(0, 1.7f, 0), d = target - eye;
             Sim.Player.Yaw = M.Atan2(-d.X, -d.Z); Sim.Player.Pitch = M.Atan2(d.Y, M.Hypot(d.X, d.Z));
+        }
+        // Stand in front of a soldier, a little to one side, and look at him.
+        void Near(Soldier so, float dist, float side)
+        {
+            float fx = M.Sin(so.Yaw), fz = M.Cos(so.Yaw);
+            float x = so.Pos.X + fx * dist + fz * side, z = so.Pos.Z + fz * dist - fx * side;
+            Sim.Player.Pos = new Vector3(x, so.Pos.Y, z);
+            Aim(so.Pos + new Vector3(0, 1.45f, 0));
         }
         void Teleport(float x, float z, float yaw, float pitch)
         {

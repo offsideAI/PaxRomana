@@ -171,7 +171,7 @@ namespace PaxRomana
 
     public sealed class Textures
     {
-        public Tex Stone, Slate, Snow, Rock, Bark, Timber, Leather, Water, Leaves, Banner, Windows, Cloud, Soft, Glow, Scope, Vignette, White;
+        public Tex Stone, Slate, Ground, Rock, Bark, Timber, Leather, Water, Leaves, Banner, Windows, Cloud, Soft, Glow, Scope, Vignette, White;
 
         delegate void Fn(float u, float v, out float r, out float g, out float b, out float h);
 
@@ -204,7 +204,7 @@ namespace PaxRomana
 
         static float H(int a, int b, int s) { return (float)Noise.Hash2(a, b, s); }
 
-        // Ashlar courses; tinted brick red, ochre or grey by the material that uses it. One tile = 4 m.
+        // Ashlar courses; tinted limestone grey, cream or brick red by the material that uses it. One tile = 4 m.
         static Tex MakeStone(int size)
         {
             const int rows = 12;
@@ -247,16 +247,15 @@ namespace PaxRomana
             }, 0.25f);
         }
 
-        // Wind-packed snow: near-white with soft drifts and a little sparkle. Multiplied by the terrain's vertex colours.
-        static Tex MakeSnow(int size)
+        // Ground cover: a light, mottled pattern of clumps and blades, multiplied by the terrain's vertex colours.
+        static Tex MakeGround(int size)
         {
             return Gen(size, (float u, float v, out float r, out float g, out float b, out float h) =>
             {
-                float n = Noise.Fbm(u * 6, v * 6, 4, 3, 6), s = Noise.Fbm(u * 48, v * 48, 2, 8, 48);
-                float sparkle = H((int)(u * size), (int)(v * size), 77) > 0.985f ? 0.08f : 0;
-                float k = 0.86f + n * 0.1f + s * 0.06f + sparkle;
-                r = k; g = k; b = k; h = n * 0.6f + s * 0.4f;
-            }, 0.5f);
+                float n = Noise.Fbm(u * 6, v * 6, 4, 3, 6), s = Noise.Fbm(u * 48, v * 48, 2, 8, 48), f = Noise.Fbm(u * 110, v * 110, 2, 18, 110);
+                float k = 0.72f + n * 0.2f + s * 0.16f + f * 0.12f;
+                r = k * (0.98f + n * 0.06f); g = k; b = k * (0.96f - n * 0.05f); h = n * 0.4f + s * 0.4f + f * 0.4f;
+            }, 0.7f);
         }
 
         static Tex MakeRock(int size)
@@ -314,7 +313,8 @@ namespace PaxRomana
             }, 2.2f);
         }
 
-        static Vector3 Frost(Vector3 c, float k) { return Vector3.Lerp(c, new Vector3(0.78f, 0.85f, 0.93f), k); }
+        // sunlit leaves: a share of each sprite is pulled towards a bright yellow-green
+        static Vector3 Frost(Vector3 c, float k) { return Vector3.Lerp(c, new Vector3(0.56f, 0.70f, 0.24f), k * 0.55f); }
 
         static Vector3 Hsl(float h, float s, float l)
         {
@@ -335,7 +335,7 @@ namespace PaxRomana
         static Tex MakeLeaves()
         {
             const int S = 256;
-            Canvas c = new Canvas(S * 4, S, new Color(90, 105, 100, 0));
+            Canvas c = new Canvas(S * 4, S, new Color(58, 92, 40, 0));
             for (int kind = 0; kind < 3; kind++)
             {
                 Mulberry r = new Mulberry((uint)(kind + 1));
@@ -348,7 +348,7 @@ namespace PaxRomana
                         for (int k = 0; k < 26; k++)
                         {
                             float an = r.Next() * M.TAU, len = 18 + r.Next() * 24;
-                            Vector3 col = Frost(Hsl(88 + r.Next() * 30, 30 + r.Next() * 20, 13 + r.Next() * 16), 0.18f + r.Next() * 0.3f);
+                            Vector3 col = Frost(Hsl(92 + r.Next() * 30, 34 + r.Next() * 20, 15 + r.Next() * 16), 0.18f + r.Next() * 0.3f);
                             float lw = 1.6f + r.Next();
                             c.Line(ox + cx, cy, ox + cx + M.Cos(an) * len, cy + M.Sin(an) * len, lw, col);
                         }
@@ -361,8 +361,8 @@ namespace PaxRomana
                     {
                         float a = r.Next() * M.TAU, d = M.Pow(r.Next(), 0.6f) * 104;
                         float x = S / 2 + M.Cos(a) * d, y = S / 2 + M.Sin(a) * d;
-                        float light = kind == 2 ? 10 + r.Next() * 14 : 17 + r.Next() * 20 + (i > 80 ? 6 : 0);
-                        Vector3 col = Frost(Hsl(hue + r.Next() * 34, 38 + r.Next() * 24, light), (kind == 2 ? 0.15f : 0.3f) + r.Next() * 0.35f);
+                        float light = kind == 2 ? 12 + r.Next() * 14 : 20 + r.Next() * 20 + (i > 80 ? 6 : 0);
+                        Vector3 col = Frost(Hsl(hue + r.Next() * 34, 44 + r.Next() * 24, light), (kind == 2 ? 0.15f : 0.3f) + r.Next() * 0.35f);
                         float rx = 9 + r.Next() * 8, ry = 4.5f + r.Next() * 4, rot = r.Next() * 3.14f;
                         c.Ellipse(ox + x, y, rx, ry, rot, col);
                     }
@@ -372,64 +372,81 @@ namespace PaxRomana
             return c.T;
         }
 
-        // The legion's standard: crimson cloth, gold border, laurel wreath, eagle and SPQR.
+        // The garrison's flag: a red field with a white disc and a black emblem. The texture is square with the
+        // disc in the middle; the renderer maps it so the disc stays round on a banner of any shape, and the red
+        // edge texels stretch over the rest of the cloth (so the border must be a flat colour).
         static Tex MakeBanner()
         {
-            const int W = 256, HH = 512;
-            Canvas c = new Canvas(W, HH, Color.Black);
-            Vector3 gold = M.Hex(0xd9b24c);
-            for (int x = 0; x < W; x++)
-            {
-                float t = Math.Abs(x / (float)W - 0.5f) * 2;
-                Vector3 col = Vector3.Lerp(M.Hex(0xa31a14), M.Hex(0x6f0f0c), t);
-                for (int y = 0; y < HH; y++) c.T.Px[y * W + x] = M.Col(col.X, col.Y, col.Z);
-            }
-            c.Rect(14 - 4.5f, 14 - 4.5f, W - 28 + 9, 9, gold); c.Rect(14 - 4.5f, HH - 14 - 4.5f, W - 28 + 9, 9, gold);
-            c.Rect(14 - 4.5f, 14, 9, HH - 28, gold); c.Rect(W - 14 - 4.5f, 14, 9, HH - 28, gold);
-            c.Rect(27, 27, W - 54, 2, gold); c.Rect(27, HH - 29, W - 54, 2, gold); c.Rect(27, 27, 2, HH - 54, gold); c.Rect(W - 29, 27, 2, HH - 54, gold);
-            for (int i = 0; i < 26; i++)
-            {
-                float a = -M.PI / 2 + (i / 26f) * M.TAU;
-                if (Math.Abs(a - M.PI / 2) < 0.25f) continue;
-                float x = W / 2 + M.Cos(a) * 70, y = 190 + M.Sin(a) * 70;
-                c.Ellipse(x, y, 15, 6, a + 1.1f * Math.Sign(M.Cos(a)), gold);
-            }
-            float m = W / 2;
-            c.Poly(new[] { m, 150, m + 48, 172, m + 18, 186, m + 10, 226, m, 212, m - 10, 226, m - 18, 186, m - 48, 172 }, gold);
-            c.Text(FontFace.Get("Display"), "SPQR", m, 352, 60, gold);
-            c.Rect(60, 372, W - 120, 4, gold);
-            for (int i = 0; i < 12; i++) c.Rect(22 + i * 18.5f, HH - 40, 9, 30, gold);
-            Mulberry r = new Mulberry(99);
-            for (int i = 0; i < c.T.Px.Length; i++)
-            {
-                float n = 0.86f + r.Next() * 0.2f; Color p = c.T.Px[i];
-                c.T.Px[i] = new Color((byte)Math.Min(255, p.R * n), (byte)Math.Min(255, p.G * n), (byte)Math.Min(255, p.B * n));
-            }
-            c.T.Repeat = false;
-            return c.T;
+            const int S = 256, SS = 4;
+            Tex t = new Tex(S, S) { Repeat = false };
+            Vector3 red = M.Hex(0xb5181c), white = new Vector3(0.93f, 0.92f, 0.88f), black = new Vector3(0.05f, 0.05f, 0.05f);
+            const float R = 0.36f;                   // disc radius, as a share of the texture
+            const float ARM = R * 2 * 0.62f / 5;      // the emblem sits on a 5 x 5 grid of this unit
+            for (int y = 0; y < S; y++)
+                for (int x = 0; x < S; x++)
+                {
+                    float disc = 0, ink = 0;
+                    for (int j = 0; j < SS; j++)
+                        for (int i = 0; i < SS; i++)
+                        {
+                            float px = (x + (i + 0.5f) / SS) / S - 0.5f, py = 0.5f - (y + (j + 0.5f) / SS) / S;      // y up
+                            if (px * px + py * py > R * R) continue;
+                            disc++;
+                            if (Emblem(px / ARM, py / ARM)) ink++;
+                        }
+                    disc /= SS * SS; ink /= SS * SS;
+                    Vector3 c = Vector3.Lerp(red, white, disc);
+                    c = Vector3.Lerp(c, black, ink);
+                    t.Px[y * S + x] = M.Col(c.X, c.Y, c.Z);
+                }
+            return t;
         }
 
-        // Lit windows on a dark glass facade. One repeat = 8 floors by 8 bays.
+        // Is the point (in units of one arm width, origin at the centre, y up) inside the emblem?
+        static bool Emblem(float x, float y)
+        {
+            if (!Config.HISTORICAL_INSIGNIA)
+                return (Math.Abs(x) < 0.6f && Math.Abs(y) < 2.3f) || (Math.Abs(y) < 0.6f && Math.Abs(x) < 2.3f);      // plain cross
+            const float c = 0.70710678f;
+            float u = (x + y) * c, v = (y - x) * c;                  // turn the figure onto its point
+            if (Math.Abs(u) < 0.5f && Math.Abs(v) < 2.5f) return true;
+            if (Math.Abs(v) < 0.5f && Math.Abs(u) < 2.5f) return true;
+            if (v > 1.5f && v < 2.5f && u > 0 && u < 2.5f) return true;        // top arm, hooked right
+            if (u > 1.5f && u < 2.5f && v < 0 && v > -2.5f) return true;       // right arm, hooked down
+            if (v < -1.5f && v > -2.5f && u < 0 && u > -2.5f) return true;     // bottom arm, hooked left
+            if (u < -1.5f && u > -2.5f && v > 0 && v < 2.5f) return true;      // left arm, hooked up
+            return false;
+        }
+
+        // Factory wall for the enrichment works: board-marked concrete with bands of small dark panes.
+        // One repeat = 4 storeys by 8 bays.
         static Tex MakeWindows()
         {
-            const int N = 8, S = 128;
-            Canvas c = new Canvas(S, S, new Color(26, 32, 48));
+            const int S = 128;
+            Canvas c = new Canvas(S, S, new Color(150, 148, 140));
             Mulberry rng = new Mulberry(31);
-            float cell = S / (float)N;
-            int[] tints = { 0xffd9a0, 0xffe9c8, 0x9fe8ff, 0xbfd4ff, 0xff9fd0 };
-            for (int j = 0; j < N; j++)
-                for (int i = 0; i < N; i++)
+            for (int i = 0; i < S * S; i++)
+            {
+                int x = i % S, y = i / S;
+                float n = 0.86f + Noise.Fbm(x * 0.09, y * 0.3, 3, 71) * 0.26f - (y % 32 < 2 ? 0.12f : 0);       // pour lines
+                Color p = c.T.Px[i];
+                c.T.Px[i] = new Color((byte)(p.R * n), (byte)(p.G * n), (byte)(p.B * n));
+            }
+            for (int j = 0; j < 4; j++)
+                for (int i = 0; i < 8; i++)
                 {
-                    if (rng.Next() < 0.76f) continue;
-                    float a = 0.35f + rng.Next() * 0.65f;
-                    float pick = rng.Next();
-                    int tint = tints[(int)(pick * (rng.Next() < 0.75f ? 2 : tints.Length))];
-                    c.Rect(i * cell + 3, j * cell + 4, cell - 6, cell - 9, M.Hex(tint), a);
+                    float x0 = i * 16 + 2.5f, y0 = j * 32 + 8;
+                    for (int py = 0; py < 3; py++)
+                        for (int px = 0; px < 3; px++)
+                        {
+                            float k = 0.10f + rng.Next() * 0.12f;
+                            c.Rect(x0 + px * 3.8f, y0 + py * 5.4f, 3.0f, 4.6f, new Vector3(k * 0.8f, k * 0.95f, k * 1.15f));
+                        }
                 }
             return c.T;
         }
 
-        // Cloud deck: coverage in alpha, colour lit from the low sun.
+        // Cloud deck: fair-weather cumulus. Coverage in alpha, colour lit from the sun's side.
         static Tex MakeCloud(int size)
         {
             Tex t = new Tex(size, size);
@@ -439,10 +456,10 @@ namespace PaxRomana
                 {
                     float u = (float)x / size * 6, v = (float)y / size * 6;
                     float d = Noise.Fbm(u, v, 5, 61, 6), d2 = Noise.Fbm(u + sd.X * 6, v + sd.Y * 6, 5, 61, 6);
-                    float cov = M.Smoothstep(0.47f, 0.72f, d);
+                    float cov = M.Smoothstep(0.52f, 0.70f, d);
                     float lit = M.Clamp((d - d2) * 5 + 0.55f);
-                    Vector3 col = Vector3.Lerp(new Vector3(0.44f, 0.42f, 0.54f), new Vector3(1.0f, 0.86f, 0.70f), lit);
-                    col = Vector3.Lerp(col, new Vector3(1.0f, 0.72f, 0.5f), (1 - cov) * 0.5f);
+                    Vector3 col = Vector3.Lerp(new Vector3(0.66f, 0.70f, 0.78f), new Vector3(1.0f, 0.99f, 0.96f), lit);
+                    col = Vector3.Lerp(col, new Vector3(0.96f, 0.97f, 1.0f), (1 - cov) * 0.5f);
                     t.Px[y * size + x] = M.Col(col.X, col.Y, col.Z, cov * 0.92f);
                 }
             return t;
@@ -497,7 +514,7 @@ namespace PaxRomana
         {
             Textures t = new Textures();
             t.Stone = MakeStone(512); progress(0.25f);
-            t.Slate = MakeSlate(256); t.Snow = MakeSnow(256); t.Rock = MakeRock(256); progress(0.5f);
+            t.Slate = MakeSlate(256); t.Ground = MakeGround(256); t.Rock = MakeRock(256); progress(0.5f);
             t.Bark = MakeBark(128); t.Timber = MakeTimber(256); t.Leather = MakeLeather(256); t.Water = MakeWater(256); progress(0.7f);
             t.Leaves = MakeLeaves(); t.Banner = MakeBanner(); t.Windows = MakeWindows(); t.Cloud = MakeCloud(256); progress(0.9f);
             t.Soft = MakeDisc(64, 0.08f, 1); t.Glow = MakeDisc(64, 0.0f, 2.2f); t.Scope = MakeScope(1024); t.Vignette = MakeVignette(256);

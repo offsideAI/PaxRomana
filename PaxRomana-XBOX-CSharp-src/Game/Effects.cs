@@ -1,4 +1,4 @@
-// Particles (dust, chips, blood mist, water, smoke, explosions), falling snow and two flocks of birds over the valley.
+// Particles (dust, chips, blood mist, water, smoke, explosions), drifting summer seeds and two flocks of birds over the valley.
 // Simulation only: the renderer turns these into camera-facing sprites.
 using System;
 using System.Collections.Generic;
@@ -18,11 +18,11 @@ namespace PaxRomana
 
     public sealed class Fx
     {
-        public const int MAX = 1600, SNOW = 1500; const float SNOW_R = 26;
+        public const int MAX = 1600, MOTES = 260; const float MOTE_R = 22;
         public readonly Particle[] P = new Particle[MAX];
         public int Count;
-        public readonly Vector3[] Snow = new Vector3[SNOW];
-        public bool SnowVisible = true;
+        public readonly Vector3[] Motes = new Vector3[MOTES];
+        public bool MotesVisible = true;
         public readonly List<Bird> Birds = new List<Bird>();
         public readonly Shockwave[] Rings = { new Shockwave(), new Shockwave(), new Shockwave() };
         public Vector3 FlashPos; public float FlashT;         // explosion flash (0.4 s)
@@ -30,7 +30,7 @@ namespace PaxRomana
 
         public Fx()
         {
-            for (int i = 0; i < SNOW; i++) Snow[i] = new Vector3((M.Rand() - 0.5f) * 2 * SNOW_R, (M.Rand() - 0.5f) * 2 * SNOW_R, (M.Rand() - 0.5f) * 2 * SNOW_R);
+            for (int i = 0; i < MOTES; i++) Motes[i] = new Vector3((M.Rand() - 0.5f) * 2 * MOTE_R, (M.Rand() - 0.5f) * 2 * MOTE_R, (M.Rand() - 0.5f) * 2 * MOTE_R);
             for (int i = 0; i < 16; i++)
             {
                 bool flock = i >= 9;
@@ -53,7 +53,7 @@ namespace PaxRomana
         public void Dust(Vector3 p, Vector3 n, string kind)
         {
             float c0, c1, c2;
-            if (kind == "stone") { c0 = 0.62f; c1 = 0.56f; c2 = 0.46f; } else if (kind == "wood") { c0 = 0.4f; c1 = 0.3f; c2 = 0.2f; } else { c0 = 0.78f; c1 = 0.8f; c2 = 0.85f; }
+            if (kind == "stone") { c0 = 0.62f; c1 = 0.56f; c2 = 0.46f; } else if (kind == "wood") { c0 = 0.4f; c1 = 0.3f; c2 = 0.2f; } else { c0 = 0.52f; c1 = 0.44f; c2 = 0.31f; }
             for (int i = 0; i < 16; i++)
             {
                 float sp = 1 + R() * 3.5f, k = 0.8f + R() * 0.4f;
@@ -152,16 +152,16 @@ namespace PaxRomana
                 r.Scale = 1 + r.T * 17;
                 r.Opacity = 0.55f * (1 - r.T) * (1 - r.T);
             }
-            // snow: a box of flakes that stays wrapped around the camera; hidden through the scope, where near flakes would fill the glass
-            SnowVisible = fov > 30;
-            for (int i = 0; i < SNOW; i++)
+            // seeds and pollen on the breeze: a box of motes that stays wrapped around the camera; hidden through the scope, where near ones would fill the glass
+            MotesVisible = fov > 30;
+            for (int i = 0; i < MOTES; i++)
             {
-                Vector3 s = Snow[i];
-                s.X += (0.5f + (i % 7) * 0.05f) * dt; s.Y -= (1.0f + (i % 5) * 0.16f) * dt; s.Z += 0.15f * dt;
-                float d = s.X - cam.X; if (d > SNOW_R) s.X -= SNOW_R * 2; else if (d < -SNOW_R) s.X += SNOW_R * 2;
-                d = s.Y - cam.Y; if (d > SNOW_R) s.Y -= SNOW_R * 2; else if (d < -SNOW_R) s.Y += SNOW_R * 2;
-                d = s.Z - cam.Z; if (d > SNOW_R) s.Z -= SNOW_R * 2; else if (d < -SNOW_R) s.Z += SNOW_R * 2;
-                Snow[i] = s;
+                Vector3 s = Motes[i];
+                s.X += (0.5f + (i % 7) * 0.05f) * dt; s.Y += M.Sin(i * 1.7f + s.X * 0.6f) * 0.12f * dt; s.Z += 0.15f * dt;
+                float d = s.X - cam.X; if (d > MOTE_R) s.X -= MOTE_R * 2; else if (d < -MOTE_R) s.X += MOTE_R * 2;
+                d = s.Y - cam.Y; if (d > MOTE_R) s.Y -= MOTE_R * 2; else if (d < -MOTE_R) s.Y += MOTE_R * 2;
+                d = s.Z - cam.Z; if (d > MOTE_R) s.Z -= MOTE_R * 2; else if (d < -MOTE_R) s.Z += MOTE_R * 2;
+                Motes[i] = s;
             }
             foreach (Bird b in Birds)
             {

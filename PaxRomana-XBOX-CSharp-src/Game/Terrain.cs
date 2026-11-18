@@ -1,5 +1,5 @@
 // Heightfield terrain: a dense inner tile around the valley and a coarse outer ring out to the horizon.
-// Snow, slush on the roads and bare rock on the slopes are baked into vertex colours.
+// Meadow grass, bare earth on the roads and rock on the slopes are baked into vertex colours.
 using System;
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
@@ -17,13 +17,13 @@ namespace PaxRomana
             double h = (Noise.Fbm(x * 0.0012 + 10, z * 0.0012 + 10, 5, 1) - 0.5) * 110 + 22;
             h += (Noise.Fbm(x * 0.011, z * 0.011, 3, 2) - 0.5) * 5;
             float rv = M.Hypot(x - 60, z - 190);
-            // open valley between the ridge and the Kremlin
+            // open valley between the ridge and the castle
             float vm = 1 - M.Smoothstep(330, 720, rv);
             h = h + ((8 + (h - 22) * 0.12) - h) * vm;
             // river
             float rm = 1 - M.Smoothstep(12, 46, Math.Abs(z - Config.RiverZ(x)));
             h = h + (-3.2 - h) * rm;
-            // Kremlin rock
+            // castle rock
             float d = M.Hypot(x, z);
             if (d < 150)
             {
@@ -31,7 +31,7 @@ namespace PaxRomana
                 float crag = (Noise.Fbm(x * 0.06, z * 0.06, 3, 5) - 0.5f) * 7 * M.Smoothstep(60, 82, d) * hm;
                 h = h + (Config.PLATEAU - h) * hm + crag;
             }
-            // legion camp terrace
+            // garrison camp terrace
             float dc = M.Hypot(x - Config.CAMP_X, z - Config.CAMP_Z);
             if (dc < 100) h = h + (Config.CAMP_H - h) * (1 - M.Smoothstep(58, 100, dc));
             // sniper's ridge
@@ -40,6 +40,9 @@ namespace PaxRomana
             // distant mountains
             float far = M.Smoothstep(900, 2800, rv);
             if (far > 0) h += far * far * Noise.Fbm(x * 0.0008 + 3, z * 0.0008 + 9, 4, 9) * 380;
+            // level ground for the enrichment works (outside the playable valley)
+            float dw = M.Hypot(x - Config.WORKS_X, z - Config.WORKS_Z);
+            if (dw < 380) h = h + (Config.WORKS_H - h) * (1 - M.Smoothstep(250, 380, dw));
             return (float)h;
         }
 
@@ -57,7 +60,7 @@ namespace PaxRomana
             return a + (b - a) * fx + (c - a) * fz + (a - b - c + d) * fx * fz;
         }
 
-        // how much the ground at (x, z) is trodden to slush: the Kremlin plateau, the camp, the roads
+        // how much the ground at (x, z) is worn to bare earth: the castle rock, the camp, the roads, the works yard
         static float Trodden(float x, float z)
         {
             float t = 0;
@@ -70,6 +73,7 @@ namespace PaxRomana
                 float dr = Math.Min(M.DistToPath(x, z, Config.ROAD), M.DistToPath(x, z, Config.ROAD2));
                 t += (60f / 255) * (1 - M.Smoothstep(3.0f, 5.5f, dr)) + (90f / 255) * (1 - M.Smoothstep(1.8f, 4.0f, dr)) + (110f / 255) * (1 - M.Smoothstep(0.6f, 2.6f, dr));
             }
+            t += (200f / 255) * (1 - M.Smoothstep(230, 270, M.Hypot(x - Config.WORKS_X, z - Config.WORKS_Z)));
             return M.Clamp(t);
         }
 
@@ -78,15 +82,16 @@ namespace PaxRomana
             float nb = Noise.Fbm(x * 0.05, z * 0.05, 3, 91);
             float gB = 0.25f + 0.3f * nb;
             float macro = MacroAt(x, z);
-            Vector3 tint = Vector3.Lerp(new Vector3(1.04f, 1.0f, 0.94f), new Vector3(0.93f, 0.98f, 1.05f), M.Smoothstep(0.3f, 0.7f, macro));
-            Vector3 snow = new Vector3(0.90f, 0.93f, 0.98f) * (0.8f + gB * 0.5f) * tint;
-            Vector3 slush = new Vector3(0.36f, 0.33f, 0.31f) * (0.75f + gB * 0.7f);
-            Vector3 rock = new Vector3(0.50f, 0.47f, 0.44f) * (0.7f + nb * 0.6f);
+            // summer meadow: sun-yellowed in some places, lush in others, darker under the far forests
+            Vector3 tint = Vector3.Lerp(new Vector3(1.22f, 1.04f, 0.72f), new Vector3(0.80f, 1.0f, 0.86f), M.Smoothstep(0.3f, 0.7f, macro));
+            Vector3 grass = new Vector3(0.31f, 0.39f, 0.17f) * (0.8f + gB * 0.5f) * tint;
+            Vector3 earth = new Vector3(0.50f, 0.41f, 0.29f) * (0.75f + gB * 0.7f);
+            Vector3 rock = new Vector3(0.52f, 0.49f, 0.44f) * (0.7f + nb * 0.6f);
             float slope = 1 - ny;
-            float rockW = M.Smoothstep(0.13f, 0.3f, slope + (gB - 0.3f) * 0.22f);
+            float rockW = Math.Max(M.Smoothstep(0.13f, 0.3f, slope + (gB - 0.3f) * 0.22f), M.Smoothstep(230, 400, y) * 0.85f);      // bare summits
             float shore = 1 - M.Smoothstep(0.2f, 1.8f, y);
             float dirtW = M.Clamp(Trodden(x, z) * 1.25f * (0.75f + gB) + shore);
-            Vector3 c = Vector3.Lerp(snow, slush, dirtW);
+            Vector3 c = Vector3.Lerp(grass, earth, dirtW);
             c = Vector3.Lerp(c, rock, rockW);
             return M.Col(c.X, c.Y, c.Z);
         }

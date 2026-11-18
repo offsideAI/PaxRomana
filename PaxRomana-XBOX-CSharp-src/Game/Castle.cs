@@ -1,5 +1,6 @@
-// The Kremlin of the Third Rome (red brick walls, star-topped towers, the Senate, Arsenal and a gold-domed cathedral),
-// the legion's forward base, the Moskva bridge and the broken wall at the sniper's nest.
+// Burg Adlerstein, a German hill castle held by a wartime garrison (limestone curtain walls, round towers with
+// witch-hat roofs, the keep with the vault, the armoury and a chapel), the garrison's camp, the river bridge, the
+// broken wall at the sniper's nest, and the enrichment works in the distance.
 using System;
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
@@ -63,7 +64,7 @@ namespace PaxRomana
 
     public sealed class Banner
     {
-        public float W, H; public int Sx, Sy; public Vector3 Pos; public float RotY; public bool Flag, Blue;
+        public float W, H; public int Sx, Sy; public Vector3 Pos; public float RotY; public bool Flag;
     }
 
     public sealed class DoorLeaf { public Vector3 Pivot; public float W, H, Closed, Open, Angle; }
@@ -85,9 +86,10 @@ namespace PaxRomana
         public readonly List<Banner> Banners = new List<Banner>();
         public readonly List<Vector3> Smoke = new List<Vector3>(), Torches = new List<Vector3>();
         public float KeepX, KeepZ, KeepTop, KeepHalf, GateTop;
-        public const float CapX = 0, CapZ = 15, CapR = 7;       // the flagpole in the courtyard
-        public Banner CapFlag;
-        public static readonly string[] ColliderKeys = { "stone", "plaster", "concrete", "slate", "gold", "timber", "tent", "tentRed", "iron" };
+        public const float CapX = 0, CapZ = -14.2f, CapR = 2.3f;      // in front of the strongbox in the vault of the keep
+        public const float PoleX = 0, PoleZ = 15;                      // the flagpole in the courtyard
+        public Geo Keys;                                                // the key ring on the strongbox, drawn until it is taken
+        public static readonly string[] ColliderKeys = { "stone", "plaster", "concrete", "slate", "gold", "timber", "tent", "tentDark", "iron" };
 
         void Slit(float x, float y, float z, float ry, float w = 0.28f, float h = 1.7f) { B.Box("dark", w, h, 0.3f, x, y, z, ry); }
         void Win(float x, float y, float z, float ry, float w = 1.0f, float h = 2.3f)
@@ -141,7 +143,6 @@ namespace PaxRomana
             B.Box("stone", len, 4, 4.2f, cx, P - 1.5f, cz, ry);                                   // battered plinth
             B.Box("stone", len, 0.45f, 0.5f, cx + nx * 1.7f, top - 0.25f, cz + nz * 1.7f, ry);     // corbel table
             B.Box("stone", len, 1.0f, 0.55f, cx + nx * 1.55f, top + 0.5f, cz + nz * 1.55f, ry);    // parapet
-            B.Box("neon", len - 1, 0.07f, 0.07f, cx + nx * 1.99f, top - 0.75f, cz + nz * 1.99f, ry);   // light strip under the corbels
             B.Box("stone", len, 0.35f, 0.4f, cx - nx * 1.3f, top + 0.17f, cz - nz * 1.3f, ry);     // inner kerb
             Solids.Add(Solid.Box(Math.Min(ax, bx) - (nx != 0 ? 1.9f : 0), Math.Max(ax, bx) + (nx != 0 ? 1.9f : 0), Math.Min(az, bz) - (nz != 0 ? 1.9f : 0), Math.Max(az, bz) + (nz != 0 ? 1.9f : 0)));
             int n = (int)Math.Floor(len / 2.5f);
@@ -152,7 +153,7 @@ namespace PaxRomana
             }
         }
 
-        // round tower with machicolations, a green tented roof and a red star
+        // round tower with machicolations and a slate witch-hat roof
         void Tower(float x, float z, float r, float hAbove, float roofH, bool flag = true)
         {
             float y0 = P - 14, H = hAbove + 14, yt = P + hAbove;
@@ -173,9 +174,8 @@ namespace PaxRomana
             }
             B.Cyl("slate", r + 1.45f, r + 1.45f, 0.18f, x, yt + 3.15f, z, 32, 3);
             B.Cyl("slate", 0.05f, r + 1.35f, roofH, x, yt + 3.2f + roofH / 2, z, 32, 3);
-            B.Cyl("gold", 0.05f, 0.07f, 2.6f, x, yt + 3.2f + roofH + 1.2f, z, 6);
-            B.Add("star", Geo.Octahedron(0.95f).Scale(1, 1, 0.4f).Translate(x, yt + 3.2f + roofH + 3.1f, z));
-            Stars.Add(new Vector3(x, yt + 3.2f + roofH + 3.1f, z));
+            B.Cyl("iron", 0.05f, 0.07f, 3.4f, x, yt + 3.2f + roofH + 1.6f, z, 6);
+            B.Add("iron", Geo.Sphere(0.16f, 8, 6).Translate(x, yt + 3.2f + roofH - 0.05f, z));
             for (int lv = 0; lv < 3; lv++)
                 for (int i = 0; i < 6; i++)
                 {
@@ -184,7 +184,6 @@ namespace PaxRomana
                 }
             if (flag) Banners.Add(new Banner { W = 2.6f, H = 1.3f, Sx = 10, Sy = 4, Pos = new Vector3(x, yt + 3.2f + roofH + 1.7f, z), RotY = -0.35f, Flag = true });
         }
-        public readonly List<Vector3> Stars = new List<Vector3>();
 
         void Torch(float x, float y, float z, bool light = true)
         {
@@ -246,7 +245,7 @@ namespace PaxRomana
             Slit(-3.5f, P + 11, 40, 0); Slit(3.5f, P + 11, 40, 0);
             Banners.Add(new Banner { W = 3, H = 6.4f, Sx = 6, Sy = 14, Pos = new Vector3(0, P + 12.2f, 40.35f) });
 
-            // ---- the Senate (keep) ----
+            // ---- the keep, with the vault on its ground floor ----
             const float KX = 0, KZ = -10, KW = 17, ROOM = 5; float kTop = P + 32, KH = KW / 2;
             KeepX = KX; KeepZ = KZ; KeepTop = kTop; KeepHalf = KH;
             B.Box("plaster", KW, 32 - ROOM, KW, KX, (kTop + P + ROOM) / 2, KZ);
@@ -284,7 +283,7 @@ namespace PaxRomana
             foreach (float s in new[] { -4.5f, 4.5f }) Banners.Add(new Banner { W = 2.6f, H = 11, Sx = 6, Sy = 20, Pos = new Vector3(KX + s, kTop - 9, KZ + KW / 2 + 0.45f) });
             Banners.Add(new Banner { W = 4.2f, H = 2.1f, Sx = 12, Sy = 5, Pos = new Vector3(KX, kTop + 11, KZ), RotY = -0.35f, Flag = true });
 
-            // ---- Arsenal (great hall) and cathedral ----
+            // ---- armoury (great hall) and chapel ----
             Shell(-43, -30, -28, 18, P - 1, P + 11, 1, null, null, new[] { new Gap(-5, 1.8f, 2.8f) }, null);
             B.Prism("slate", 14.4f, 7.5f, 47.5f, -36.5f, P + 11, -5);
             for (int i = 0; i < 6; i++) Win(-29.95f, P + 5.5f, -24 + i * 7.6f, M.HALF_PI, 1.1f, 3);
@@ -293,13 +292,17 @@ namespace PaxRomana
             Solids.Add(Solid.Box(34.3f, 37.7f, -12.2f, -8.8f));
             B.Prism("slate", 13.2f, 7, 21.4f, 36, P + 9, -22);
             B.Box("stone", 3.4f, 20, 3.4f, 36, P + 9, -10.5f);
-            Onion(36, P + 19, -10.5f, 2.5f);
-            foreach (float dz in new[] { -16f, -20, -24, -28 }) { B.Cyl("plaster", 1.0f, 1.0f, 3.4f, 36, P + 14.4f, dz, 14); Onion(36, P + 16, dz, 1.35f); }
+            // bell tower: louvred belfry, slate spire and a cross
+            foreach (int[] d in new[] { new[] { 0, 1 }, new[] { 0, -1 }, new[] { 1, 0 }, new[] { -1, 0 } })
+                B.Box("dark", d[0] != 0 ? 0.3f : 1.3f, 2.2f, d[1] != 0 ? 0.3f : 1.3f, 36 + d[0] * 1.62f, P + 16.6f, -10.5f + d[1] * 1.62f);
+            B.Box("stone", 4.0f, 0.4f, 4.0f, 36, P + 19.2f, -10.5f);
+            B.Add("slate", Geo.Cone(2.7f, 9, 4).RotateY(M.PI / 4).Translate(36, P + 23.9f, -10.5f));
+            B.Box("gold", 0.1f, 1.7f, 0.1f, 36, P + 29.1f, -10.5f); B.Box("gold", 0.8f, 0.1f, 0.1f, 36, P + 29.4f, -10.5f);
             for (int i = 0; i < 3; i++) Win(36 + (i - 1) * 3.4f, P + 5, -11.95f, 0, 0.8f, 2.2f);
             Slit(36, P + 16, -8.75f, 0, 0.5f, 1.6f);
 
             // ---- furnishings ----
-            // Arsenal: long table, benches, hearth
+            // armoury: long table, benches, hearth
             B.Box("timber", 1.7f, 0.12f, 16, -36.5f, P + 0.92f, -5, 0, 2);
             foreach (float z in new[] { -12f, -5, 2 }) B.Box("timber", 1.3f, 0.86f, 0.2f, -36.5f, P + 0.43f, z, 0, 2);
             Solids.Add(Solid.Box(-37.35f, -35.65f, -13, 3));
@@ -308,18 +311,23 @@ namespace PaxRomana
             B.Add("ember", Geo.Sphere(0.5f, 8, 6).Scale(0.5f, 0.3f, 1.6f).Translate(-41.6f, P + 0.2f, 8));
             Torch(-31.3f, P + 3.2f, 6, false); Torch(-31.3f, P + 3.2f, -16, false);
             Torches.Add(new Vector3(-37, P + 4.5f, -5));
-            // cathedral: altar, cross, pews
+            // chapel: altar, cross, pews
             Block("stone", 2.6f, 1.1f, 1.0f, 36, -29.4f);
             B.Box("gold", 0.12f, 1.5f, 0.12f, 36, P + 3.0f, -30.85f); B.Box("gold", 0.8f, 0.12f, 0.12f, 36, P + 3.3f, -30.85f);
             foreach (float z in new[] { -17f, -19.5f, -24.5f, -27 }) Block("timber", 5, 0.55f, 0.5f, 36.6f, z);
             Torches.Add(new Vector3(36, P + 4.2f, -22));
-            // Senate antechamber: drums and a weapon rack; command vault: plinth and strongboxes
+            // keep antechamber: drums and a weapon rack; vault: the strongbox on its plinth, and crates
             foreach (float[] t in new[] { new[] { -5.6f, -4.2f }, new[] { -4.4f, -4.4f }, new[] { -5.5f, -5.5f } }) { B.Cyl("timber", 0.45f, 0.4f, 1.0f, t[0], P + 0.5f, t[1], 12, 1.5f); Solids.Add(Solid.Circle(t[0], t[1], 0.48f)); }
             Block("timber", 2.6f, 1.9f, 0.35f, 5, -3.35f);
             for (int i = 0; i < 5; i++) B.Cyl("iron", 0.025f, 0.025f, 2.3f, 4 + i * 0.5f, P + 1.2f, -3.6f, 5);
             Torch(-6.7f, P + 2.9f, -6.5f); Torch(6.7f, P + 2.9f, -14);
             Block("stone", 0.9f, 1.0f, 0.9f, 0, -15.6f);
             B.Box("stone", 1.2f, 0.12f, 1.2f, 0, P + 1.04f, -15.6f);
+            B.Box("iron", 0.62f, 0.34f, 0.42f, 0, P + 1.27f, -15.6f); B.Box("gold", 0.66f, 0.04f, 0.46f, 0, P + 1.3f, -15.6f);      // strongbox, banded
+            Keys = new Geo();
+            Keys.Add(Geo.Torus(0.07f, 0.012f, 6, 14).Translate(0, P + 1.46f, -15.6f));
+            foreach (float a in new[] { -0.5f, 0, 0.5f })
+                Keys.Add(Geo.Box(0.022f, 0.16f, 0.012f).Translate(0, -0.08f, 0).RotateZ(a).Translate(M.Sin(a) * 0.07f, P + 1.39f, -15.6f));
             foreach (float[] t in new[] { new[] { 5f, -16.2f }, new[] { 5.4f, -12.6f } }) { Block("timber", 1.3f, 0.75f, 0.8f, t[0], t[1]); B.Box("iron", 1.34f, 0.08f, 0.84f, t[0], P + 0.5f, t[1]); }
             // courtyard well
             B.Cyl("stone", 1.25f, 1.35f, 0.9f, -16, P + 0.45f, 16, 20); B.Add("dark", Geo.Cylinder(0.95f, 0.95f, 0.06f, 20).Translate(-16, P + 0.9f, 16));
@@ -327,7 +335,7 @@ namespace PaxRomana
             B.Box("timber", 2.8f, 0.16f, 0.16f, -16, P + 2.7f, 16, 0, 1.5f);
             Solids.Add(Solid.Circle(-16, 16, 1.4f));
 
-            // ---- bridge over the Moskva ----
+            // ---- bridge over the river ----
             {
                 float bz = (Config.BRIDGE_Z0 + Config.BRIDGE_Z1) / 2, len = Config.BRIDGE_Z1 - Config.BRIDGE_Z0, bx = Config.BRIDGE_X, by = Config.BRIDGE_Y;
                 B.Box("concrete", 5.4f, 1.0f, len, bx, by - 0.5f, bz);
@@ -365,22 +373,22 @@ namespace PaxRomana
                 }
             }
 
-            // ---- the legion's forward base ----
+            // ---- the garrison's camp ----
             {
                 float cy = Config.CAMP_H, CXc = Config.CAMP_X, CZc = Config.CAMP_Z, CR = Config.CAMP_R;
                 for (int gx = -4; gx <= 4; gx++)
                     for (int gz = -4; gz <= 4; gz++)
                     {
-                        if (gx == 0 || gz == 0) continue;                  // via principalis / via praetoria
+                        if (gx == 0 || gz == 0) continue;                  // the two lanes through the camp
                         float x = CXc + gx * 8.2f, z = CZc + gz * 8.2f;
                         if (M.Hypot(x - CXc, z - CZc) > CR - 9) continue;
                         B.Prism("tent", 3.4f, 2.4f, 4.2f, x, Terrain.GroundAt(x, z) - 0.05f, z, (B.Rng.Next() - 0.5f) * 0.12f, 2);
                         Solids.Add(Solid.Box(x - 1.6f, x + 1.6f, z - 2.1f, z + 2.1f));
                     }
-                // praetorium (command tent)
-                B.Prism("tentRed", 5.5f, 3.6f, 7, CXc - 9, cy, CZc - 9, M.HALF_PI, 2);
+                // command tent
+                B.Prism("tentDark", 5.5f, 3.6f, 7, CXc - 9, cy, CZc - 9, M.HALF_PI, 2);
                 Solids.Add(Solid.Box(CXc - 12.5f, CXc - 5.5f, CZc - 11.6f, CZc - 6.4f));
-                Solids.Add(Solid.Ring(CXc, CZc, CR, 0.075f));        // palisade, gateway to the south
+                Solids.Add(Solid.Ring(CXc, CZc, CR, 0.075f));        // stockade, gateway to the south
                 int n = (int)Math.Floor(M.TAU * CR / 0.52f);
                 for (int i = 0; i < n; i++)
                 {
@@ -403,13 +411,10 @@ namespace PaxRomana
                 foreach (int[] d in new[] { new[] { 1, 0 }, new[] { -1, 0 }, new[] { 0, 1 }, new[] { 0, -1 } })
                     B.Box("timber", d[0] != 0 ? 0.12f : 3.7f, 0.12f, d[1] != 0 ? 0.12f : 3.7f, tx + d[0] * 1.8f, tg + 8.05f, tz + d[1] * 1.8f, 0, 1.5f);
                 B.Add("timber", Geo.Cone(3.2f, 1.6f, 4).RotateY(M.PI / 4).Translate(tx, tg + 11.3f, tz));
-                // aquila standard
+                // flagpole
                 B.Cyl("timber", 0.05f, 0.06f, 5.2f, CXc, cy + 2.6f, CZc + 3, 6, 1.5f);
                 Solids.Add(Solid.Circle(CXc, CZc + 3, 0.15f));
-                B.Box("gold", 1.3f, 0.12f, 0.08f, CXc, cy + 4.3f, CZc + 3);
-                B.Add("gold", Geo.Sphere(0.22f, 10, 8).Scale(1, 1.2f, 0.8f).Translate(CXc, cy + 5.45f, CZc + 3));
-                B.Box("gold", 1.1f, 0.14f, 0.3f, CXc, cy + 5.55f, CZc + 3);
-                Banners.Add(new Banner { W = 1.2f, H = 1.5f, Sx = 4, Sy = 6, Pos = new Vector3(CXc, cy + 3.5f, CZc + 3.06f) });
+                Banners.Add(new Banner { W = 2.4f, H = 1.2f, Sx = 8, Sy = 4, Pos = new Vector3(CXc, cy + 4.5f, CZc + 3), RotY = -0.35f, Flag = true });
                 // camp fires
                 foreach (float[] t in new[] { new[] { 6f, 6 }, new[] { -14f, 12 } })
                 {
@@ -424,28 +429,19 @@ namespace PaxRomana
 
             // ---- doors ----
             const float HP = M.HALF_PI;
-            AddDoor("the Spasskaya gate", false, GH, -GW, GW, 39.2f, 39.8f, new[] { new[] { -GW, 39.5f, GW, 0, HP }, new[] { GW, 39.5f, GW, M.PI, HP } });
-            AddDoor("the Arsenal door", false, 2.8f, -30.8f, -30.2f, -5.9f, -4.1f, new[] { new[] { -30.5f, -5.9f, 1.8f, -HP, -M.PI } });
-            AddDoor("the cathedral door", false, 2.7f, 30.2f, 30.8f, -22.8f, -21.2f, new[] { new[] { 30.5f, -22.8f, 1.6f, -HP, 0 } });
-            AddDoor("the Senate door", false, 2.8f, KX - 0.9f, KX + 0.9f, KZ + KH - 1.05f, KZ + KH - 0.45f, new[] { new[] { KX - 0.9f, KZ + KH - 0.75f, 1.8f, 0, HP } });
-            AddDoor("the command vault door", true, 2.6f, KX - 0.8f, KX + 0.8f, KZ - 0.3f, KZ + 0.3f, new[] { new[] { KX - 0.8f, KZ, 1.6f, 0, HP } });
+            AddDoor("the castle gate", false, GH, -GW, GW, 39.2f, 39.8f, new[] { new[] { -GW, 39.5f, GW, 0, HP }, new[] { GW, 39.5f, GW, M.PI, HP } });
+            AddDoor("the armoury door", false, 2.8f, -30.8f, -30.2f, -5.9f, -4.1f, new[] { new[] { -30.5f, -5.9f, 1.8f, -HP, -M.PI } });
+            AddDoor("the chapel door", false, 2.7f, 30.2f, 30.8f, -22.8f, -21.2f, new[] { new[] { 30.5f, -22.8f, 1.6f, -HP, 0 } });
+            AddDoor("the keep door", false, 2.8f, KX - 0.9f, KX + 0.9f, KZ + KH - 1.05f, KZ + KH - 0.45f, new[] { new[] { KX - 0.9f, KZ + KH - 0.75f, 1.8f, 0, HP } });
+            AddDoor("the vault door", true, 2.6f, KX - 0.8f, KX + 0.8f, KZ - 0.3f, KZ + 0.3f, new[] { new[] { KX - 0.8f, KZ, 1.6f, 0, HP } });
 
-            // ---- capture point: the flagpole in the courtyard ----
-            B.Add("iron", Geo.Cylinder(0.09f, 0.12f, 12, 8).Translate(CapX, P + 6, CapZ));
-            Solids.Add(Solid.Circle(CapX, CapZ, 0.2f));
-            CapFlag = new Banner { W = 4.6f, H = 2.3f, Sx = 12, Sy = 5, Pos = new Vector3(CapX, P + 10.6f, CapZ), RotY = -0.35f, Flag = true };
-            Banners.Add(CapFlag);
+            // ---- the flagpole in the courtyard ----
+            B.Add("iron", Geo.Cylinder(0.09f, 0.12f, 12, 8).Translate(PoleX, P + 6, PoleZ));
+            Solids.Add(Solid.Circle(PoleX, PoleZ, 0.2f));
+            Banners.Add(new Banner { W = 4.6f, H = 2.3f, Sx = 12, Sy = 5, Pos = new Vector3(PoleX, P + 10.6f, PoleZ), RotY = -0.35f, Flag = true });
         }
 
-        // gold onion dome with a cross
-        void Onion(float x, float y, float z, float r)
-        {
-            B.Add("gold", Geo.Sphere(r, 18, 12).Scale(1, 1.08f, 1).Translate(x, y + r * 0.85f, z));
-            B.Add("gold", Geo.Cone(r * 0.62f, r * 1.5f, 18).Translate(x, y + r * 2.25f, z));
-            B.Box("gold", 0.09f, r * 0.9f, 0.09f, x, y + r * 3.3f, z); B.Box("gold", r * 0.42f, 0.09f, 0.09f, x, y + r * 3.45f, z);
-        }
-
-        // Puts doors and the flag back to how a mission starts.
+        // Puts the doors back to how a mission starts.
         public void Reset()
         {
             foreach (Door d in Doors)
@@ -453,45 +449,66 @@ namespace PaxRomana
                 d.Amt = d.Want = 0; d.Broken = false; d.Solid.Off = false;
                 foreach (DoorLeaf l in d.Leaves) l.Angle = l.Closed;
             }
-            CapFlag.Blue = false;
         }
     }
 
-    // The skyline of future Moscow behind the Kremlin: glass towers with lit windows, beacon spires and an orbital
-    // tether rising out of the haze. Scenery only: it is beyond the playable valley and has no collision.
-    public sealed class City
+    // The U-235 enrichment works on its own levelled ground north-east of the valley: process halls, chimney stacks,
+    // cooling towers, tanks and a walled perimeter. Scenery in this level (it is outside the playable valley and has
+    // no collision); the keys in the castle vault open its gates.
+    public sealed class Works
     {
         public readonly Builder B = new Builder();
-        public readonly List<Vector3> Beacons = new List<Vector3>();
-        public static readonly Vector3 TetherPos = new Vector3(-420, 40, -1750);
-        public Geo Tether;
+        public readonly List<Vector3> Stacks = new List<Vector3>();      // chimney tops
 
-        public static City Build()
+        public static Works Build()
         {
-            City c = new City();
-            Builder B = c.B; Mulberry rng = new Mulberry(2187);
-            const float TILE = 34;                                   // one texture repeat = 8 floors x 8 bays
-            int n = 0, tries = 0;
-            while (n < 85 && tries++ < 600)
-            {
-                // an arc north of the Kremlin, from west round to east, 520 - 1500 m out
-                float a = -M.PI * (0.06f + rng.Next() * 0.88f), r = 520 + M.Pow(rng.Next(), 0.8f) * 980;
-                float x = M.Cos(a) * r * 1.25f, z = M.Sin(a) * r - 60;
-                float g = Terrain.HeightAt(x, z);
-                if (g < 2 || g > 150) continue;
-                bool tall = rng.Next() < 0.22f; float w = 26 + rng.Next() * 34, d = 26 + rng.Next() * 34, h = tall ? 230 + rng.Next() * 190 : 70 + rng.Next() * 120;
-                B.Box("tower", w, h + 30, d, x, g + h / 2 - 15, z, rng.Next() * 0.6f, TILE);
-                if (tall)
+            Works c = new Works();
+            Builder B = c.B; Mulberry rng = new Mulberry(235);
+            const float X = Config.WORKS_X, Z = Config.WORKS_Z, G = Config.WORKS_H, TILE = 16;
+            // process halls in two rows, long axis east-west, with a monitor roof along each ridge
+            for (int row = 0; row < 2; row++)
+                for (int i = 0; i < 3; i++)
                 {
-                    B.Box("tower", w * 0.6f, h * 0.22f, d * 0.6f, x, g + h + h * 0.11f, z, 0, TILE);
-                    B.Cyl("beaconPole", 0.7f, 1.4f, 46, x, g + h * 1.22f + 23, z, 6);
-                    B.Add("beacon", Geo.Sphere(2.6f, 8, 6).Translate(x, g + h * 1.22f + 47, z));
-                    c.Beacons.Add(new Vector3(x, g + h * 1.22f + 47, z));
+                    float w = 120 + rng.Next() * 30, h = 20 + rng.Next() * 8, d = 34, x = X - 150 + i * 150 + (rng.Next() - 0.5f) * 14, z = Z - 55 + row * 105;
+                    B.Box("works", w, h + 6, d, x, G + h / 2 - 3, z, 0, TILE);
+                    B.Prism("slate", d + 2, 6, w + 2, x, G + h, z, M.HALF_PI, 6);
+                    B.Box("works", w * 0.8f, 3.5f, 7, x, G + h + 5.2f, z, 0, TILE);
                 }
-                else if (rng.Next() < 0.5f) B.Box("strip", w + 0.6f, 1.6f, d + 0.6f, x, g + h * (0.55f + rng.Next() * 0.4f), z, 0, TILE);
-                n++;
+            // the cascade building: taller, windowless
+            B.Box("concrete", 70, 44, 46, X + 30, G + 19, Z - 140, 0, 8);
+            B.Box("concrete", 22, 12, 22, X + 30, G + 47, Z - 140, 0, 8);
+            // chimney stacks
+            foreach (float[] t in new[] { new[] { -190f, -130 }, new[] { -120f, -150 }, new[] { 150f, -135 }, new[] { 205f, 10 }, new[] { -205f, 60 } })
+            {
+                float h = 70 + rng.Next() * 30, x = X + t[0], z = Z + t[1];
+                B.Cyl("brick", 2.4f, 4.4f, h, x, G + h / 2, z, 14, 6);
+                B.Cyl("concrete", 2.9f, 2.9f, 1.4f, x, G + h - 3, z, 14, 6);
+                c.Stacks.Add(new Vector3(x, G + h, z));
             }
-            c.Tether = Geo.Cylinder(3.5f, 9, 9000, 8, true).Translate(0, 4500, 0).Translate(TetherPos);
+            // cooling towers: a waisted concrete shell
+            foreach (float[] t in new[] { new[] { 120f, 130 }, new[] { 185f, 115 } })
+            {
+                float x = X + t[0], z = Z + t[1];
+                B.Cyl("concrete", 19, 28, 34, x, G + 17, z, 28, 10);
+                B.Cyl("concrete", 22, 19, 20, x, G + 44, z, 28, 10);
+            }
+            // tanks and a water tower
+            for (int i = 0; i < 4; i++) B.Cyl("concrete", 11, 11, 13, X - 190 + i * 30, G + 6.5f, Z + 135, 20, 8);
+            B.Cyl("concrete", 1.6f, 2.2f, 30, X - 60, G + 15, Z + 150, 10, 6); B.Cyl("concrete", 7.5f, 5, 9, X - 60, G + 33, Z + 150, 18, 6);
+            // perimeter wall with watch towers at the corners and a gatehouse on the valley side
+            const float PW = 250, PD = 195;
+            foreach (int sgn in new[] { -1, 1 })
+            {
+                B.Box("concrete", PW * 2, 7, 1.6f, X, G + 2.5f, Z + sgn * PD, 0, 8);
+                B.Box("concrete", 1.6f, 7, PD * 2, X + sgn * PW, G + 2.5f, Z, 0, 8);
+                foreach (int s2 in new[] { -1, 1 })
+                {
+                    B.Box("concrete", 7, 19, 7, X + sgn * PW, G + 8.5f, Z + s2 * PD, 0, 8);
+                    B.Add("slate", Geo.Cone(6.2f, 4, 4).RotateY(M.PI / 4).Translate(X + sgn * PW, G + 20, Z + s2 * PD));
+                }
+            }
+            B.Box("concrete", 26, 13, 9, X - 40, G + 5.5f, Z + PD, 0, 8);
+            B.Box("dark", 9, 7.5f, 9.4f, X - 40, G + 2.7f, Z + PD);
             return c;
         }
     }

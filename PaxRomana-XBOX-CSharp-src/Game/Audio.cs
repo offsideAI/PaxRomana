@@ -143,7 +143,7 @@ namespace PaxRomana
             s.Noise(white, 0, 0.16f, HP, 1800, 900, 1.0f, 0.8f, 0.002f, 0.5f);
             s.Noise(white, 0, 0.55f, LP, 2600, 120, 1.3f, 0.8f, 0.002f, 0.8f);
             s.Tone(0, 0.3f, SINE, 140, 38, 1.2f, 0.3f);
-            s.Noise(brown, 1.15f, 0.9f, LP, 900, 150, 0.5f, 0.8f, 0.08f, 0.6f);        // slap-back from the Kremlin walls
+            s.Noise(brown, 1.15f, 0.9f, LP, 900, 150, 0.5f, 0.8f, 0.08f, 0.6f);        // slap-back from the castle walls
             s.Noise(brown, 2.3f, 1.4f, LP, 500, 100, 0.28f, 0.8f, 0.2f, 0.6f);         // then the far hills
             c["shot"] = s.Finish();
 

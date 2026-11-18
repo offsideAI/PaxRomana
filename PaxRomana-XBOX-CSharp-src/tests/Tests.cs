@@ -54,8 +54,8 @@ namespace PaxRomana
             World world = World.Build((p, text) => { }, false);
             Console.WriteLine("World built in " + sw.ElapsedMilliseconds + " ms: " + world.Colliders.Triangles + " collision triangles, " + world.Solids.Count + " solids, "
                 + world.Terrain.Count + " terrain tiles, " + world.Veg.Near.Count + " + " + world.Veg.Far.Count + " vegetation chunks, " + world.Castle.Doors.Count + " doors");
-            Check(world.Colliders.Triangles > 20000, "collision mesh has the Kremlin and the camp in it");
-            Check(Math.Abs(Terrain.GroundAt(0, 0) - Config.PLATEAU) < 0.5f, "the Kremlin plateau is at " + Terrain.GroundAt(0, 0).ToString("0.0") + " m");
+            Check(world.Colliders.Triangles > 20000, "collision mesh has the castle and the camp in it");
+            Check(Math.Abs(Terrain.GroundAt(0, 0) - Config.PLATEAU) < 0.5f, "the castle rock is at " + Terrain.GroundAt(0, 0).ToString("0.0") + " m");
 
             NullAudio audio = new NullAudio();
             sim = new GameSim(world, audio, new Pad(), new KeyMouse(), new Hud());
@@ -63,9 +63,16 @@ namespace PaxRomana
             for (int i = 0; i < 60; i++) Tick();
             Check(!sim.Started && sim.Hud.MenuVisible, "starts on the title screen");
 
-            Console.WriteLine("1. Controller");
+            Console.WriteLine("1. Intro and controller");
             Press(Btn.A);
-            Check(sim.Started && sim.Player.Enabled && !sim.Hud.MenuVisible && sim.Hud.IsPad, "A starts the mission and switches the prompts to the controller");
+            Check(sim.Intro && !sim.Started && !sim.Hud.MenuVisible && sim.Hud.IntroOn && sim.Hud.Cine, "A on the title screen starts the Level Zero intro");
+            Tick(120);
+            IntroCard card = IntroScript.At(sim.Hud.IntroT);
+            Check(card != null && card.Title == "LEVEL ZERO", "two seconds in, the title card reads \"" + (card == null ? "" : card.Title + ": " + card.Sub) + "\"");
+            Check(!sim.Player.Enabled && sim.Time == 0, "the mission clock does not run during the intro");
+            Press(Btn.A);
+            Check(!sim.Intro && !sim.Hud.IntroOn && !sim.Hud.Cine, "A skips the intro");
+            Check(sim.Started && sim.Player.Enabled && !sim.Hud.MenuVisible && sim.Hud.IsPad, "the mission starts, with controller prompts");
             Vector3 p0 = sim.Player.Pos; float yaw0 = sim.Player.Yaw;
             axes[1] = -1; Tick(60); Release();
             float moved = Vector3.Distance(sim.Player.Pos, p0);
@@ -78,7 +85,7 @@ namespace PaxRomana
 
             Console.WriteLine("2. Rifle shot and its haptics");
             sim.Player.Pos = new Vector3(Config.SPAWN_X, Terrain.GroundAt(Config.SPAWN_X, Config.SPAWN_Z), Config.SPAWN_Z);
-            Soldier guard = sim.Legion.Soldiers[9];           // a gate guard: stands still until the alarm
+            Soldier guard = sim.Garrison.Soldiers[9];           // a gate guard: stands still until the alarm
             Vector3 chest = guard.Pos + new Vector3(0, 1.25f, 0);
             AimAt(chest);
             sim.Player.AlwaysSteady = true;        // take scope sway out of it: this checks the ballistics, not the marksman
@@ -86,7 +93,7 @@ namespace PaxRomana
             Check(sim.Weapon.Scoped && sim.Player.Holding, "LT raises the scope, LB holds breath");
             AimAt(chest); Tick(20);
             float range = Vector3.Distance(sim.Player.Cam.Pos, chest);
-            sim.Legion.AlertLevel = 0;
+            sim.Garrison.AlertLevel = 0;
             sim.AlwaysKillCam = true;              // otherwise the kill-cam starts on some shots and not others
             btn[Btn.RT] = 1; Tick();
             Check(sim.Weapon.Mag == 4 && audio.Shots == 1, "RT fires one round");
@@ -112,30 +119,36 @@ namespace PaxRomana
             bool blockedBefore = world.Colliders.Raycast(new Vector3(1, Config.PLATEAU + 1.5f, 50), new Vector3(0, 0, -1), 60, out hd, out hn, out wood);
             Check(blockedBefore && Math.Abs(50 - hd - 39.57f) < 0.3f, "a closed gate stops a bullet at z = " + (50 - hd).ToString("0.0"));
             AimAt(gate); btn[Btn.LT] = 1; btn[Btn.LB] = 1; Tick(40); AimAt(gate); Tick(10);
-            int alive0 = sim.Legion.AliveCount;
+            int alive0 = sim.Garrison.AliveCount;
             btn[Btn.RB] = 1; Tick(); btn[Btn.RB] = 0;
             Check(sim.Weapon.Charges == 7, "RB fires a charge (7 left)");
             float peak = 0; int frames = 0;
             while (audio.Explosions == 0 && frames++ < 240) Tick();
             Check(audio.Explosions == 1, "the charge detonates after " + (frames * DT).ToString("0.00") + " s of flight");
             for (int i = 0; i < 150; i++) { Tick(); peak = Math.Max(peak, sim.Pad.Out[0]); }
-            Check(gateDoor.Broken && gateDoor.Solid.Off, "the blast breaches the Spasskaya gate");
-            Check(alive0 - sim.Legion.AliveCount >= 1, "the blast kills " + (alive0 - sim.Legion.AliveCount) + " defender(s) at the gate");
+            Check(gateDoor.Broken && gateDoor.Solid.Off, "the blast breaches the castle gate");
+            Check(alive0 - sim.Garrison.AliveCount >= 1, "the blast kills " + (alive0 - sim.Garrison.AliveCount) + " defender(s) at the gate");
             Check(peak > 0.15f, "the explosion rumbles when its sound arrives (peak " + peak.ToString("0.00") + ")");
             bool blockedAfter = world.Colliders.Raycast(new Vector3(1, Config.PLATEAU + 1.5f, 50), new Vector3(0, 0, -1), 14, out hd, out hn, out wood);
             Check(!blockedAfter, "after the breach a bullet passes through the gateway");
             Release(); Tick(30);
 
-            Console.WriteLine("4. Capture");
+            Console.WriteLine("4. The keys");
             sim.Player.Pos = new Vector3(0, Config.PLATEAU, 50); Tick(2);
             Check(sim.Capture.Stage == 0, "outside the walls the objective is to breach: \"" + sim.Hud.ObjLine + "\"");
-            Go(0, 30, "walk in through the breached gate"); Go(7, 22, "round the flagpole"); Go(0, 16.5f, "up to the flagpole");
+            Go(0, 30, "walk in through the breached gate"); Go(4, 12, "across the courtyard, past the flagpole"); Go(0, 0.3f, "up to the keep");
+            Check(sim.Hud.PromptText == "Open the keep door", "prompt at the keep: [" + sim.Hud.PromptKey + "] " + sim.Hud.PromptText);
+            Press(Btn.A); Tick(60);
+            Go(0, -7.4f, "into the keep, up to the vault wall");
+            Check(sim.Hud.PromptText == "Open the vault door", "prompt at the vault: [" + sim.Hud.PromptKey + "] " + sim.Hud.PromptText);
+            Press(Btn.A); Tick(60);
+            Go(0, -13.6f, "into the vault, up to the strongbox");
             Tick(120);
-            Check(sim.Capture.Progress == 0 && sim.Hud.CaptureText.StartsWith("Contested"), "the flag is contested while defenders live: \"" + sim.Hud.CaptureText + "\"");
+            Check(sim.Capture.Progress == 0 && sim.Hud.CaptureText.StartsWith("Contested"), "the strongbox cannot be cracked while defenders live: \"" + sim.Hud.CaptureText + "\"");
             int inside = 0; Soldier lastOne = null;
-            foreach (Soldier s in sim.Legion.Soldiers) if (s.Alive && Capture.InWalls(s.Pos.X, s.Pos.Z)) { inside++; lastOne = s; }
-            Console.WriteLine("        " + inside + " defenders inside the walls of " + sim.Legion.Total + " in the garrison");
-            foreach (Soldier s in sim.Legion.Soldiers) if (s.Alive && s != lastOne && Capture.InWalls(s.Pos.X, s.Pos.Z)) s.Kill(Vector3.UnitX, false);
+            foreach (Soldier s in sim.Garrison.Soldiers) if (s.Alive && Capture.InWalls(s.Pos.X, s.Pos.Z)) { inside++; lastOne = s; }
+            Console.WriteLine("        " + inside + " defenders inside the walls of " + sim.Garrison.Total + " in the garrison");
+            foreach (Soldier s in sim.Garrison.Soldiers) if (s.Alive && s != lastOne && Capture.InWalls(s.Pos.X, s.Pos.Z)) s.Kill(Vector3.UnitX, false);
             Tick(2);
             Check(sim.Hud.HintText.StartsWith("Last defender"), "hint for the last one: \"" + sim.Hud.HintText + "\"");
             lastOne.Kill(Vector3.UnitX, true); Tick(2);
@@ -143,19 +156,24 @@ namespace PaxRomana
             Tick(60 * 4);
             Check(sim.Capture.Progress > 0.45f && sim.Capture.Progress < 0.55f, "half way after 4 s (" + sim.Capture.Progress.ToString("0.00") + ")");
             Tick(60 * 5);
-            Check(sim.Capture.Done && world.Castle.CapFlag.Blue, "the Kremlin is captured after 8 s and the flag changes");
+            Check(sim.Capture.Done && sim.Hud.ObjLine == "You have the keys to the enrichment zone", "the strongbox opens after 8 s: \"" + sim.Hud.ObjLine + "\"");
             Tick(60 * 4);
-            Check(sim.Over && sim.Win && sim.Hud.EndVisible, "the mission ends in victory: " + sim.Hud.Stats.Kills + "/" + sim.Hud.Stats.Total + " down, " + sim.Hud.Stats.Charges + " charge used");
+            Check(sim.Over && sim.Win && sim.Hud.EndVisible, "Level Zero ends in victory: " + sim.Hud.Stats.Kills + "/" + sim.Hud.Stats.Total + " down, " + sim.Hud.Stats.Charges + " charge used");
 
             Console.WriteLine("5. New mission and doors");
             Press(Btn.A);
             Check(sim.RestartRequested, "A on the end screen asks for a new mission");
             sim = new GameSim(world, audio, new Pad(), new KeyMouse(), new Hud());
             sim.Hud.SetReady();
-            Check(!gateDoor.Broken && !gateDoor.Solid.Off && !world.Castle.CapFlag.Blue, "a new mission restores the gate and the flag");
+            Check(!gateDoor.Broken && !gateDoor.Solid.Off && !sim.Capture.Done, "a new mission restores the gate and the strongbox");
             Tick(); Press(Btn.A);
+            int introFrames = 0; bool sawOrders = false;
+            while (sim.Intro && introFrames++ < 60 * 40) { Tick(); IntroCard c2 = IntroScript.At(sim.Hud.IntroT); if (c2 != null && c2.Kicker == "YOUR ORDERS, AGENT") sawOrders = true; }
+            Check(!sim.Intro && sim.Started && sawOrders, "left alone, the intro plays its briefing and ends by itself after " + (introFrames * DT).ToString("0.0") + " s");
+            sim.SetPlaying(false); Press(Btn.A);
+            Check(!sim.Intro && sim.Player.Enabled, "resuming from pause does not replay the intro");
             // a kill-cam left to play out, from the nest, before any sentry has been disturbed
-            Soldier other = sim.Legion.Soldiers[10];
+            Soldier other = sim.Garrison.Soldiers[10];
             Vector3 chest2 = other.Pos + new Vector3(0, 1.25f, 0);
             sim.Player.AlwaysSteady = true; sim.AlwaysKillCam = true;
             AimAt(chest2); btn[Btn.LT] = 1; Tick(40); AimAt(chest2); Tick(10);
@@ -168,7 +186,7 @@ namespace PaxRomana
             Check(sim.Weapon.Bullets.Count == 0, "no stray rounds are left in flight");
             sim.Player.AlwaysSteady = false;
             sim.Player.Pos = new Vector3(0, Config.PLATEAU, 41.5f); Tick(2);
-            Check(sim.Hud.PromptText == "Open the Spasskaya gate" && sim.Hud.PromptKey == "A", "prompt at the gate: [" + sim.Hud.PromptKey + "] " + sim.Hud.PromptText);
+            Check(sim.Hud.PromptText == "Open the castle gate" && sim.Hud.PromptKey == "A", "prompt at the gate: [" + sim.Hud.PromptKey + "] " + sim.Hud.PromptText);
             Vector3 before = sim.Player.Pos;
             sim.Player.Yaw = 0; sim.Km.Down[(int)K.W] = true; Tick(120); sim.Km.Down[(int)K.W] = false;
             Check(sim.Player.Pos.Z > 39.5f, "the closed gate blocks the way (stopped at z = " + sim.Player.Pos.Z.ToString("0.0") + ")");

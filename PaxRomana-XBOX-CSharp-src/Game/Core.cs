@@ -7,14 +7,19 @@ namespace PaxRomana
 {
     public static class Config
     {
-        public const float PLATEAU = 30;                 // height of the Kremlin plateau
+        public const float PLATEAU = 30;                 // height of the castle rock
         public const float WALL_H = 13;                  // curtain wall height
         public const float WALK_Y = PLATEAU + WALL_H;
         public const float SPAWN_X = 120, SPAWN_Z = 412;
         public const float CAMP_X = 170, CAMP_Z = 10, CAMP_R = 52, CAMP_H = 9;
         public const float INNER_X0 = -540, INNER_Z0 = -410, INNER_SIZE = 1200;
         public const int INNER_N = 400;
-        public static readonly Vector3 SUN_DIR = Vector3.Normalize(new Vector3(-0.76f, 0.19f, 0.46f));   // low winter sun
+        public static readonly Vector3 SUN_DIR = Vector3.Normalize(new Vector3(-0.52f, 0.66f, 0.50f));   // high summer sun, early afternoon
+        // The U-235 enrichment works beyond the valley: scenery in this level, the setting of the next ones.
+        public const float WORKS_X = 450, WORKS_Z = -800, WORKS_H = 18;
+        // true: the garrison flies the historical flag. false: a plain black cross on the white disc, for places
+        // where showing the historical symbol is restricted.
+        public static readonly bool HISTORICAL_INSIGNIA = true;
         public const float MUZZLE_V = 880;
         public const float GRAVITY = 9.81f;
         public static readonly Vector3 WIND = new Vector3(0.5f, 0, 0.12f);     // lateral acceleration on projectiles (m/s^2)

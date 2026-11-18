@@ -31,19 +31,19 @@ namespace PaxRomana
         sealed class Mat { public Texture2D Tex; public Vector3 Colour = Vector3.One; public float Spec, Alpha = 1; public bool Lit = true, Fog = true, TwoSided, VCol; }
         sealed class Part { public Mesh Mesh; public Mat Mat; }
         sealed class ChunkGpu { public Mesh Trunk, Rock, Leaf; public BoundingSphere Bs; }
-        sealed class BannerGpu { public Banner B; public Vtx[] V; public short[] Idx; public Vector2[] Uv; public Vector3[] Base; }
+        sealed class BannerGpu { public Banner B; public Vtx[] V; public short[] Idx; public Vector2[] Uv, Tc; public Vector3[] Base; }
         sealed class LeafGpu { public Mesh Leaf; public Mesh[] Straps; public DoorLeaf L; public Door D; }
 
         // textures
         public Texture2D White, Soft, Glow, ScopeTex, Vignette;
-        Texture2D stone, slate, snow, rock, bark, timber, leather, water, leaves, banner, windows, cloud;
+        Texture2D stone, slate, ground, rock, bark, timber, leather, water, leaves, banner, windows, cloud;
         // world
         readonly List<Part> statics = new List<Part>(), emissive = new List<Part>();
         readonly List<Mesh> terrain = new List<Mesh>();
         readonly List<ChunkGpu> chunks = new List<ChunkGpu>();
         readonly List<BannerGpu> banners = new List<BannerGpu>();
         readonly List<LeafGpu> doorLeaves = new List<LeafGpu>();
-        Mesh[][] soldier; Mesh rifle, bolt, waterMesh, ringMesh, shockMesh, skyMesh, bulletMesh, tether;
+        Mesh[][] soldier; Mesh rifle, bolt, waterMesh, ringMesh, shockMesh, skyMesh, bulletMesh, keys;
         Mat soldierMat, timberMat, ironMat, bannerMat;
         VertexBuffer[] grassVb; IndexBuffer grassIb; int grassCap;
         World world;
@@ -148,35 +148,31 @@ namespace PaxRomana
         {
             world = w;
             Textures t = w.Tex;
-            stone = Upload(t.Stone); slate = Upload(t.Slate); snow = Upload(t.Snow); rock = Upload(t.Rock); bark = Upload(t.Bark); timber = Upload(t.Timber);
+            stone = Upload(t.Stone); slate = Upload(t.Slate); ground = Upload(t.Ground); rock = Upload(t.Rock); bark = Upload(t.Bark); timber = Upload(t.Timber);
             leather = Upload(t.Leather); water = Upload(t.Water); leaves = Upload(t.Leaves); banner = Upload(t.Banner); windows = Upload(t.Windows); cloud = Upload(t.Cloud);
             if (Soft == null) LoadBasics(t);
 
             foreach (IndexedMesh m in w.Terrain) terrain.Add(Up(m));
 
-            timberMat = new Mat { Tex = timber, Colour = M.Hex(0x7a8496), Spec = 0.35f };       // plasteel
+            timberMat = new Mat { Tex = timber, Colour = M.Hex(0x9a7650) * 1.25f, Spec = 0.08f };      // oak
             ironMat = new Mat { Colour = M.Hex(0x34353a), Spec = 0.6f };
             Dictionary<string, Mat> mats = new Dictionary<string, Mat>
             {
-                { "stone", new Mat { Tex = stone, Colour = M.Hex(0xb04a3c) * 1.45f, Spec = 0.04f } },       // Kremlin red brick
-                { "plaster", new Mat { Tex = stone, Colour = M.Hex(0xf2dfa4) * 1.3f, Spec = 0.03f } },      // ochre palace walls
-                { "concrete", new Mat { Tex = stone, Colour = M.Hex(0x8f949c) * 1.35f, Spec = 0.03f } },
-                { "slate", new Mat { Tex = slate, Colour = M.Hex(0x4f9a78) * 1.15f, Spec = 0.3f } },         // green tented roofs
+                { "stone", new Mat { Tex = stone, Colour = M.Hex(0xb9b2a0) * 1.12f, Spec = 0.03f } },        // weathered limestone
+                { "plaster", new Mat { Tex = stone, Colour = M.Hex(0xe9dfc6) * 1.05f, Spec = 0.03f } },      // lime-washed keep and halls
+                { "concrete", new Mat { Tex = stone, Colour = M.Hex(0x9a9a94) * 1.1f, Spec = 0.03f } },
+                { "brick", new Mat { Tex = stone, Colour = M.Hex(0x9a4a36) * 1.2f, Spec = 0.03f } },          // chimney stacks
+                { "slate", new Mat { Tex = slate, Colour = new Vector3(0.46f, 0.41f, 0.36f), Spec = 0.2f } },    // dark grey slate roofs (the tint takes the blue out of the texture)
                 { "dark", new Mat { Colour = M.Hex(0x0b0a09) } },
                 { "iron", ironMat },
                 { "gold", new Mat { Colour = M.Hex(0xd9b04a), Spec = 0.9f } },
                 { "timber", timberMat },
-                { "tent", new Mat { Tex = leather, Colour = M.Hex(0x6a7482) * 1.5f, TwoSided = true } },
-                { "tentRed", new Mat { Tex = leather, Colour = M.Hex(0xa8362a) * 1.5f, TwoSided = true } },
-                { "neon", new Mat { Colour = new Vector3(0.25f, 0.88f, 1.0f), Lit = false } },
-                { "star", new Mat { Colour = new Vector3(1.0f, 0.13f, 0.11f), Lit = false } },
+                { "tent", new Mat { Tex = leather, Colour = M.Hex(0x6f7458) * 1.3f, TwoSided = true } },      // field-grey canvas
+                { "tentDark", new Mat { Tex = leather, Colour = M.Hex(0x4d5640) * 1.3f, TwoSided = true } },
                 { "ember", new Mat { Colour = new Vector3(1.0f, 0.42f, 0.1f), Lit = false } },
-                { "tower", new Mat { Tex = windows, Colour = new Vector3(1.15f), Lit = false } },
-                { "beaconPole", new Mat { Colour = M.Hex(0x22262e), Spec = 0.4f } },
-                { "beacon", new Mat { Colour = new Vector3(1.0f, 0.22f, 0.18f), Lit = false } },
-                { "strip", new Mat { Colour = new Vector3(0.35f, 0.95f, 1.0f), Lit = false } },
+                { "works", new Mat { Tex = windows, Colour = new Vector3(1.05f), Spec = 0.03f } },           // factory walls of the enrichment works
             };
-            foreach (Builder b in new[] { w.Castle.B, w.City.B })
+            foreach (Builder b in new[] { w.Castle.B, w.Works.B })
                 foreach (KeyValuePair<string, Geo> kv in b.Parts)
                 {
                     Mat mat; if (!mats.TryGetValue(kv.Key, out mat)) mat = new Mat();
@@ -184,7 +180,7 @@ namespace PaxRomana
                     if (mesh == null) continue;
                     (mat.Lit ? statics : emissive).Add(new Part { Mesh = mesh, Mat = mat });
                 }
-            tether = Up(w.City.Tether);
+            keys = Up(w.Castle.Keys);
 
             foreach (Door d in w.Castle.Doors)
                 foreach (DoorLeaf l in d.Leaves)
@@ -202,13 +198,17 @@ namespace PaxRomana
                 if (b.Flag) g.Translate(b.W / 2, 0, 0);
                 // index the grid so each frame only moves (Sx + 1) x (Sy + 1) vertices
                 int row = b.Sx + 1, n = row * (b.Sy + 1);
-                BannerGpu bg = new BannerGpu { B = b, V = new Vtx[n], Base = new Vector3[n], Uv = new Vector2[n], Idx = new short[b.Sx * b.Sy * 6] };
+                BannerGpu bg = new BannerGpu { B = b, V = new Vtx[n], Base = new Vector3[n], Uv = new Vector2[n], Tc = new Vector2[n], Idx = new short[b.Sx * b.Sy * 6] };
+                float shortSide = Math.Min(b.W, b.H);
                 for (int iy = 0; iy <= b.Sy; iy++)
                     for (int ix = 0; ix <= b.Sx; ix++)
                     {
                         int i = iy * row + ix;
                         bg.Base[i] = new Vector3(ix * b.W / b.Sx - b.W / 2 + (b.Flag ? b.W / 2 : 0), b.H / 2 - iy * b.H / b.Sy, 0);
                         bg.Uv[i] = new Vector2((float)ix / b.Sx, 1 - (float)iy / b.Sy);
+                        // the flag texture is square with the disc at its centre: keep the disc round on any shape of cloth and let
+                        // the red edge of the texture run out to the hems (the sampler clamps)
+                        bg.Tc[i] = new Vector2(0.5f + ((float)ix / b.Sx - 0.5f) * b.W / shortSide, 0.5f + ((float)iy / b.Sy - 0.5f) * b.H / shortSide);
                     }
                 int k = 0;
                 for (int iy = 0; iy < b.Sy; iy++)
@@ -219,7 +219,7 @@ namespace PaxRomana
                     }
                 banners.Add(bg);
             }
-            bannerMat = new Mat { Tex = banner, TwoSided = true };
+            bannerMat = new Mat { Tex = banner, TwoSided = true, Colour = new Vector3(1.25f) };
             ringMesh = Up(Geo.Torus(Castle.CapR, 0.07f, 6, 72).RotateX(M.HALF_PI).Translate(Castle.CapX, Config.PLATEAU + 0.12f, Castle.CapZ));
             shockMesh = Up(Geo.Ring(0.82f, 1, 48));
 
@@ -239,7 +239,7 @@ namespace PaxRomana
 
             soldier = new Mesh[Soldier.PARTS][];
             for (int i = 0; i < Soldier.PARTS; i++) soldier[i] = new[] { Up(w.SoldierParts[i][0]), w.SoldierParts[i][1] == w.SoldierParts[i][0] ? null : Up(w.SoldierParts[i][1]) };
-            soldierMat = new Mat { VCol = true, Spec = 0.35f, Colour = new Vector3(1.6f) };
+            soldierMat = new Mat { VCol = true, Spec = 0.12f, Colour = new Vector3(1.25f) };
             rifle = Up(w.Rifle); bolt = Up(w.Bolt);
             bulletMesh = Up(Geo.Cylinder(0.004f, 0.012f, 0.09f, 10).RotateX(-M.HALF_PI));
 
@@ -249,7 +249,7 @@ namespace PaxRomana
                 for (int i = 0; i < g.Count; i++) g.T[i] = g.T[i] * 500;
                 waterMesh = Up(g);
             }
-            // sky dome, coloured per vertex: haze at the horizon, deep blue overhead, a warm glow around the sun
+            // sky dome, coloured per vertex: haze at the horizon, summer blue overhead, a glow around the sun
             {
                 Geo g = Geo.Sphere(1, 48, 24);
                 VertexPositionColor[] v = new VertexPositionColor[g.Count];
@@ -279,12 +279,12 @@ namespace PaxRomana
         static Color SkyColour(Vector3 d)
         {
             float t = M.Clamp(d.Y);
-            Vector3 zenith = new Vector3(0.24f, 0.34f, 0.58f), horizon = Lighting.Fog;
+            Vector3 zenith = new Vector3(0.17f, 0.40f, 0.80f), horizon = Lighting.Fog;
             Vector3 c = Vector3.Lerp(horizon, zenith, M.Pow(t, 0.5f));
             float sun = Math.Max(0, Vector3.Dot(d, Config.SUN_DIR));
-            // warm band along the horizon on the sun's side, and a glow around the disc
-            c += new Vector3(0.42f, 0.2f, 0.02f) * M.Pow(sun, 3) * (1 - M.Smoothstep(0.0f, 0.5f, d.Y));
-            c += new Vector3(0.6f, 0.36f, 0.14f) * M.Pow(sun, 28);
+            // a brighter horizon on the sun's side, and a glow around the disc
+            c += new Vector3(0.14f, 0.11f, 0.05f) * M.Pow(sun, 3) * (1 - M.Smoothstep(0.0f, 0.5f, d.Y));
+            c += new Vector3(0.5f, 0.44f, 0.3f) * M.Pow(sun, 28);
             if (d.Y < 0) c = Vector3.Lerp(c, horizon, M.Clamp(-d.Y * 6));
             return M.Col(c.X, c.Y, c.Z);
         }
@@ -365,8 +365,7 @@ namespace PaxRomana
             // ---- opaque ----
             gd.BlendState = BlendState.Opaque; gd.DepthStencilState = DepthStencilState.Default; gd.RasterizerState = cullBack;
             gd.SamplerStates[0] = SamplerState.AnisotropicWrap;
-            Mat ground = new Mat { Tex = snow, VCol = true, Spec = 0.06f, Colour = new Vector3(0.98f) };
-            Use(ground);
+            Use(new Mat { Tex = ground, VCol = true, Spec = 0.02f, Colour = new Vector3(1.02f) });
             foreach (Mesh m in terrain) if (Visible(m.Bs)) Draw(m, Matrix.Identity);
             foreach (Part p in statics) { Use(p.Mat); Draw(p.Mesh, Matrix.Identity); }
             foreach (LeafGpu l in doorLeaves)
@@ -377,7 +376,7 @@ namespace PaxRomana
                 Use(ironMat); Draw(l.Straps[0], w);
             }
             // trunks and boulders
-            Mat barkMat = new Mat { Tex = bark, Colour = new Vector3(1.5f) }, rockMat = new Mat { Tex = rock, Colour = M.Hex(0xd8d2c6) * 1.25f };
+            Mat barkMat = new Mat { Tex = bark, Colour = new Vector3(1.35f) }, rockMat = new Mat { Tex = rock, Colour = M.Hex(0xcfc8b8) * 1.6f };
             Use(barkMat);
             foreach (ChunkGpu c in chunks) if (c.Trunk != null && Visible(c.Bs)) Draw(c.Trunk, Matrix.Identity);
             Use(rockMat);
@@ -411,21 +410,19 @@ namespace PaxRomana
             }
             gd.SamplerStates[0] = SamplerState.AnisotropicWrap;
 
-            // lights: neon strips, tower stars, embers, skyline windows, the capture ring
+            // unlit: embers, the marker ring at the strongbox, and the keys until they are taken
             gd.RasterizerState = cullBack;
             foreach (Part p in emissive) { Use(p.Mat); Draw(p.Mesh, Matrix.Identity); }
-            Unlit(null, sim.Capture.Done ? new Vector3(0.3f, 0.9f, 1.0f) : new Vector3(1.0f, 0.2f, 0.15f), 1, false, false);
+            Unlit(null, sim.Capture.Done ? new Vector3(0.3f, 0.9f, 1.0f) : new Vector3(1.0f, 0.78f, 0.25f), 1, false, false);
             Draw(ringMesh, Matrix.Identity);
+            if (!sim.Capture.Done) { gd.RasterizerState = cullNone; Use(new Mat { Colour = M.Hex(0xe2b84e) * 1.2f, Spec = 0.9f }); Draw(keys, Matrix.Identity); gd.RasterizerState = cullBack; }
             DrawBirds(sim);
 
             // ---- transparent ----
             gd.BlendState = BlendState.NonPremultiplied; gd.DepthStencilState = DepthStencilState.DepthRead;
             // water, drifting slowly
-            Use(new Mat { Tex = water, Colour = new Vector3(0.20f, 0.27f, 0.36f), Spec = 0.9f, Alpha = 0.9f });
+            Use(new Mat { Tex = water, Colour = new Vector3(0.16f, 0.30f, 0.33f), Spec = 0.9f, Alpha = 0.88f });
             Draw(waterMesh, Matrix.CreateTranslation(60 + (clock * 0.216f) % 18, 0, 190 + (clock * 0.072f) % 18));
-            gd.RasterizerState = cullNone;
-            Unlit(null, new Vector3(0.5f, 0.95f, 1.0f), 0.8f, false, false);
-            Draw(tether, Matrix.Identity);
             DrawSprites(sim);
         }
 
@@ -458,17 +455,17 @@ namespace PaxRomana
         {
             Use(soldierMat);
             float reach = 260 * (Player.BASE_FOV / sim.ActiveCam.Fov);
-            foreach (Soldier s in sim.Legion.Soldiers)
+            foreach (Soldier s in sim.Garrison.Soldiers)
             {
                 Vector3 mid = s.Pos + new Vector3(0, 1, 0);
                 if (!Visible(new BoundingSphere(mid, 3))) continue;
                 s.Matrices(parts);
-                int k = s.Centurion ? 1 : 0;
-                // a few pixels tall at this range: body, shield and legs are enough
+                int k = s.Officer ? 1 : 0;
+                // a few pixels tall at this range: body, kit and legs are enough
                 bool far = Vector3.Distance(mid, camPos) > reach;
                 for (int i = 0; i < Soldier.PARTS; i++)
                 {
-                    if (far && (i == Soldier.ARM_L || i == Soldier.ARM_R || i == Soldier.PILUM || i == Soldier.HEAD)) continue;
+                    if (far && (i == Soldier.ARM_L || i == Soldier.ARM_R || i == Soldier.RIFLE || i == Soldier.HEAD)) continue;
                     Draw(soldier[i][k] ?? soldier[i][0], parts[i]);
                 }
             }
@@ -488,9 +485,8 @@ namespace PaxRomana
                     Vector3 p = bg.Base[i]; Vector2 uv = bg.Uv[i];
                     if (b.Flag) { float pin = uv.X; p.Z += M.Sin(uv.X * 7 - t * 5 + uv.Y * 2) * 0.28f * pin; p.Y += M.Sin(uv.X * 4 - t * 3.1f) * 0.12f * pin; }
                     else { float pin = 1 - uv.Y; p.Z += M.Sin(uv.Y * 8 - t * 2.3f + p.X * 1.5f) * 0.16f * pin; }
-                    bg.V[i] = new Vtx(Vector3.Transform(p, w), n, Color.White, new Vector2(uv.X, 1 - uv.Y));
+                    bg.V[i] = new Vtx(Vector3.Transform(p, w), n, Color.White, bg.Tc[i]);
                 }
-                bannerMat.Colour = b.Blue ? M.Hex(0x6fd0ff) * 1.5f : new Vector3(1.5f);
                 Use(bannerMat);
                 fx.World = Matrix.Identity;
                 fx.CurrentTechnique.Passes[0].Apply();
@@ -530,7 +526,7 @@ namespace PaxRomana
             gd.RasterizerState = cullNone;
             // blob shadows under soldiers nearby
             float near = 160 * (Player.BASE_FOV / sim.ActiveCam.Fov);
-            foreach (Soldier s in sim.Legion.Soldiers)
+            foreach (Soldier s in sim.Garrison.Soldiers)
             {
                 if (!s.Alive || Vector3.DistanceSquared(s.Pos, camPos) > near * near) continue;
                 Vector3 p = s.Pos + new Vector3(0, 0.05f, 0);
@@ -577,10 +573,10 @@ namespace PaxRomana
                 Quad(new Vector3(p.X, p.Y, p.Z), p.Size * 0.5f, M.Col(p.R, p.G, p.B, p.Alpha));
             }
             Flush(Soft, true);
-            if (f.SnowVisible)
+            if (f.MotesVisible)
             {
-                Color sc = new Color((byte)255, (byte)255, (byte)255, (byte)205);
-                for (int i = 0; i < Fx.SNOW; i++) Quad(f.Snow[i], 0.035f, sc);
+                Color sc = new Color((byte)255, (byte)252, (byte)232, (byte)150);
+                for (int i = 0; i < Fx.MOTES; i++) Quad(f.Motes[i], 0.022f, sc);
                 Flush(Soft, false);
             }
 
@@ -606,15 +602,13 @@ namespace PaxRomana
                 Quad(b.Pos, 0.3f * s, M.Col(1.0f, 0.55f, 0.15f, 1)); Quad(b.Pos, 0.1f * s, M.Col(1.0f, 0.95f, 0.8f, 1));
             }
             Flush(Glow, false);
-            foreach (Vector3 p in world.Castle.Stars) { Quad(p, 3.2f, new Color((byte)255, (byte)40, (byte)30, (byte)150)); }
-            foreach (Vector3 p in world.City.Beacons) { float pulse = 0.6f + 0.4f * M.Sin(sim.Clock * 1.7f + p.X); Quad(p, 22, new Color((byte)255, (byte)50, (byte)40, (byte)(170 * pulse))); }
             foreach (Vector3 p in world.Castle.Torches) Quad(p, 1.3f, new Color((byte)255, (byte)150, (byte)70, (byte)120));
             foreach (Vector3 p in world.Castle.Smoke) if (p.Y < Config.PLATEAU) Quad(p, 1.6f, new Color((byte)255, (byte)140, (byte)60, (byte)130));
             Flush(Glow, true);
-            // the sun, low over the valley
+            // the sun, high over the valley
             Vector3 sunPos = camPos + Config.SUN_DIR * 6000;
-            Quad(sunPos, 2600, new Color((byte)255, (byte)170, (byte)110, (byte)70));
-            Quad(sunPos, 520, new Color((byte)255, (byte)226, (byte)190, (byte)255));
+            Quad(sunPos, 2200, new Color((byte)255, (byte)236, (byte)200, (byte)60));
+            Quad(sunPos, 460, new Color((byte)255, (byte)250, (byte)232, (byte)255));
             Flush(Glow, false);
             gd.BlendState = BlendState.NonPremultiplied;
         }

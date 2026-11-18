@@ -1,5 +1,5 @@
-// Gauss rifle: first-person view model, scope, ammunition, and real projectile ballistics (muzzle velocity,
-// gravity drop, wind drift, time of flight). Fires sniper rounds and, from the under-barrel tube, explosive charges
+// Scoped bolt-action rifle: first-person view model, scope, ammunition, and real projectile ballistics (muzzle
+// velocity, gravity drop, wind drift, time of flight). Fires sniper rounds and, from the launcher under the barrel, explosive charges
 // that fly the same trajectory and detonate on impact.
 using System;
 using System.Collections.Generic;
@@ -81,7 +81,7 @@ namespace PaxRomana
             Recoil = explosive ? 1.5f : 1; FlashT = 0.06f; ScopeFlash = 1;
             player.Kick += (Scoped ? 0.012f : 0.05f) * (explosive ? 1.8f : 1); player.KickYaw += (M.Rand() - 0.5f) * 0.008f;
             if (explosive) W.Audio.Launch(); else { W.Audio.Shot(); W.Audio.Bolt(0.45f); }
-            W.Legion.AlertAround(cam.Pos, 0, 0, explosive ? 6 : 3);
+            W.Garrison.AlertAround(cam.Pos, 0, 0, explosive ? 6 : 3);
             if (OnFire != null) OnFire(explosive);
             return b;
         }
@@ -98,7 +98,7 @@ namespace PaxRomana
                 v.Y -= Config.GRAVITY * dt; v += Config.WIND * dt;
                 p += v * dt;
                 if (p.Y < Terrain.GroundAt(p.X, p.Z)) return null;
-                foreach (Soldier s in W.Legion.Soldiers)
+                foreach (Soldier s in W.Garrison.Soldiers)
                 {
                     if (!s.Alive || Math.Abs(s.Pos.X - p.X) + Math.Abs(s.Pos.Z - p.Z) > 12) continue;
                     SoldierHit h = s.HitTest(q, p, t);
@@ -126,7 +126,7 @@ namespace PaxRomana
             Vector3 d = p1 - p0; float len = d.Length(); d /= len;
             float best = 2; HitResult res = null;
             // soldiers
-            foreach (Soldier s in W.Legion.Soldiers)
+            foreach (Soldier s in W.Garrison.Soldiers)
             {
                 if (!s.Alive || Math.Abs(s.Pos.X - p0.X) + Math.Abs(s.Pos.Z - p0.Z) > len + 6) continue;
                 SoldierHit h = s.HitTest(p0, p1);
@@ -159,7 +159,7 @@ namespace PaxRomana
             {
                 Vector3 dir = Vector3.Normalize(b.Vel);
                 W.Fx.Blood(b.Pos, dir);
-                W.Legion.Kill(res.Soldier, dir, res.Head);
+                W.Garrison.Kill(res.Soldier, dir, res.Head);
                 Hits++; if (res.Head) Heads++; Longest = Math.Max(Longest, dist);
                 W.Audio.Hit(res.Head); W.Audio.Impact("flesh", delay, dist);
                 W.OnKill(res);
@@ -168,7 +168,7 @@ namespace PaxRomana
             {
                 if (res.Type == "water") W.Fx.Splash(b.Pos); else W.Fx.Dust(b.Pos, res.Normal, res.Type);
                 W.Audio.Impact(res.Type == "stone" ? "stone" : "dirt", delay, dist);
-                W.Legion.AlertAround(b.Pos, 9, 9, 7);
+                W.Garrison.AlertAround(b.Pos, 9, 9, 7);
             }
         }
 
@@ -235,9 +235,9 @@ namespace PaxRomana
 
         public static Geo BuildRifle()
         {
-            const int CARBON = 0x4a515b, STEEL = 0x2b2e34, BLACK = 0x17181b, CLOTH = 0x8f969f, GLOVE = 0x1b1d21, LENS = 0x2a4f88;
+            const int CARBON = 0x5b3a22, STEEL = 0x2b2e34, BLACK = 0x17181b, CLOTH = 0x3a3d2c, GLOVE = 0x2a2018, LENS = 0x2a4f88;      // walnut stock, olive sleeves
             Geo g = new Geo();
-            // composite stock: fore-end, wrist and butt
+            // walnut stock: fore-end, wrist and butt
             g.Add(Geo.Box(0.036f, 0.043f, 0.45f).Translate(0, -0.0255f, -0.145f).Paint(CARBON));
             g.Add(Geo.Box(0.034f, 0.085f, 0.1f).RotateX(-0.35f).Translate(0, -0.052f, 0.118f).Paint(CARBON));
             g.Add(Geo.Box(0.036f, 0.105f, 0.3f).RotateX(-0.09f).Translate(0, -0.048f, 0.295f).Paint(CARBON));

@@ -1,5 +1,6 @@
-// The legion: a legionary of the Third Rome (segmented composite armour, crested helmet, riot scutum and shock pilum,
-// built from primitives and animated procedurally, with head / torso / leg hit volumes) and the garrison's patrols.
+// The garrison: a German infantryman of the Second World War (field-grey tunic, steel helmet, jackboots, belt kit
+// and a slung rifle; the officer wears a peaked cap), built from primitives and animated procedurally, with
+// head / torso / leg hit volumes, and the garrison's patrols.
 using System;
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
@@ -39,19 +40,19 @@ namespace PaxRomana
     public sealed class Soldier
     {
         // parts drawn per soldier, in this order
-        public const int BODY = 0, HEAD = 1, HELMET = 2, ARM_L = 3, ARM_R = 4, SHIELD = 5, PILUM = 6, LEG_L = 7, LEG_R = 8, PARTS = 9;
+        public const int BODY = 0, HEAD = 1, HELMET = 2, ARM_L = 3, ARM_R = 4, KIT = 5, RIFLE = 6, LEG_L = 7, LEG_R = 8, PARTS = 9;
 
-        public Route Route; public float S, Lat, WalkSpeed; public bool Hold, Centurion; public int Dir = 1;
+        public Route Route; public float S, Lat, WalkSpeed; public bool Hold, Officer; public int Dir = 1;
         public bool Alive = true, Moving; public float AlertT, PauseT, Phase, Seed, Yaw, TargetYaw, DeadT;
         public Vector3 Pos, Vel, FallDir, FallAxis = Vector3.UnitX;
         // pose
-        float bodyY = 0.95f, bodyRx, headRy, headRx, legL, legR, armLx = -0.25f, armLz, armRx = -0.45f, armRz, pilumRz, shieldRx;
+        float bodyY = 0.95f, bodyRx, headRy, headRx, legL, legR, armLx = -0.25f, armLz, armRx = -0.2f, armRz, rifleRz, kitRx;
         // a helmet knocked off by a head shot flies on its own
         public bool HelmetOff; Vector3 helmetPos, helmetV, helmetSpin, helmetRot; float helmetFloor; bool helmetFlying;
 
         public Soldier(Route route, float s = 0, float lat = 0, bool hold = false, float face = 0, bool centurion = false, float speed = 1.25f)
         {
-            Route = route; S = s; Lat = lat; Hold = hold; WalkSpeed = speed; Centurion = centurion;
+            Route = route; S = s; Lat = lat; Hold = hold; WalkSpeed = speed; Officer = centurion;
             PauseT = hold ? 0 : M.Rand() * 2; Phase = M.Rand() * 6; Seed = M.Rand() * 100; Yaw = face; TargetYaw = face;
             if (route != null) Place(0);
         }
@@ -105,7 +106,7 @@ namespace PaxRomana
                 Phase += dt * (alerted ? 11 : 5.6f);
                 float sw = M.Sin(Phase) * 0.5f * run;
                 legL = sw; legR = -sw;
-                armLx = -sw * 0.25f - 0.25f;
+                armLx = -sw * 0.25f - 0.25f; armRx = sw * 0.25f - 0.2f;
                 bodyY = 0.95f + Math.Abs(M.Cos(Phase)) * 0.03f;
                 bodyRx = alerted ? 0.16f : 0.03f;
                 headRy *= 0.9f;
@@ -113,7 +114,7 @@ namespace PaxRomana
             else
             {
                 legL *= 0.85f; legR *= 0.85f;
-                armLx = -0.25f;
+                armLx = -0.25f; armRx = -0.2f;
                 bodyY = 0.95f + M.Sin(time * 1.2f + Seed) * 0.004f;
                 bodyRx = 0;
                 float look = alerted ? M.Sin(time * 3.1f + Seed) * 0.9f : M.Sin(time * 0.45f + Seed) * 0.6f + M.Sin(time * 0.17f + Seed * 2) * 0.3f;
@@ -134,8 +135,8 @@ namespace PaxRomana
             DeadT = Math.Min(1.3f, DeadT + dt);
             float t = Math.Min(1, DeadT / 0.85f), e = t * t;
             legL = e * 0.5f; legR = -e * 0.25f;
-            armLz = -e * 1.1f; armRz = e * 0.9f; armRx = -0.45f - e * 0.8f;
-            pilumRz = -e * 1.2f; shieldRx = e * 0.5f;
+            armLz = -e * 1.1f; armRz = e * 0.9f; armRx = -0.2f - e * 0.8f;
+            rifleRz = -e * 1.2f; kitRx = e * 0.5f;
             headRx = -e * 0.4f;
         }
 
@@ -214,85 +215,104 @@ namespace PaxRomana
                 : head;
             m[ARM_L] = Matrix.CreateRotationZ(armLz) * Matrix.CreateRotationX(armLx) * Matrix.CreateTranslation(-0.265f, 0.5f, 0) * body;
             m[ARM_R] = Matrix.CreateRotationZ(armRz) * Matrix.CreateRotationX(armRx) * Matrix.CreateTranslation(0.265f, 0.5f, 0) * body;
-            m[SHIELD] = Matrix.CreateRotationY(-0.55f) * Matrix.CreateRotationX(shieldRx) * Matrix.CreateTranslation(-0.33f, 0.1f, 0.14f) * body;
-            m[PILUM] = Matrix.CreateRotationZ(pilumRz) * Matrix.CreateTranslation(0.3f, -0.95f, 0.27f) * body;
+            m[KIT] = Matrix.CreateRotationX(-kitRx * 0.3f) * body;                                                         // belt kit, worn on the back of the hips
+            m[RIFLE] = Matrix.CreateRotationZ(rifleRz) * Matrix.CreateTranslation(0.2f, -0.42f, -0.17f) * body;      // slung behind the right shoulder
             m[LEG_L] = Matrix.CreateRotationX(legL) * Matrix.CreateTranslation(-0.09f, 0.93f, 0) * root;
             m[LEG_R] = Matrix.CreateRotationX(legR) * Matrix.CreateTranslation(0.09f, 0.93f, 0) * root;
         }
 
-        // ---- geometry: one vertex-coloured mesh per part; [0] legionary, [1] centurion where they differ ----
-        const int SKIN = 0x14171c, TUNIC = 0x2a2f3a, LEATHER = 0x15171b, STEEL = 0x4a525e, BRONZE = 0xc0281e, CREST = 0xe0201a, WOOD = 0x1c1e22, SHIELD_C = 0x1b222c, GOLD = 0xc8322a, CLOAK = 0x8a1210;
+        // ---- geometry: one vertex-coloured mesh per part; [0] soldier, [1] officer where they differ ----
+        const int SKIN = 0xc08e70, TUNIC = 0x4f5a4a, TROUSER = 0x555d50, LEATHER = 0x16130f, STEEL = 0x3f4a40, BUCKLE = 0xa8a495, WOOD = 0x4a2f1b, GUNMETAL = 0x23262a,
+            KIT_C = 0x5d5a44, COLLAR = 0x2c3a2e, SILVER = 0xb9bcc0, CAP_BAND = 0x24352a;
 
         public static Geo[][] BuildParts()
         {
             Geo[][] g = new Geo[PARTS][];
             g[BODY] = new[] { Body(false), Body(true) };
             g[HEAD] = One(new Geo().Add(Geo.Sphere(0.105f, 14, 10).Translate(0, 0.1f, 0).Paint(SKIN)).Add(Geo.Box(0.03f, 0.04f, 0.03f).Translate(0, 0.085f, 0.105f).Paint(SKIN)));
-            g[HELMET] = new[] { Helmet(false), Helmet(true) };
+            g[HELMET] = new[] { Helmet(), Cap() };
             Geo arm = new Geo()
-                .Add(Geo.Cylinder(0.066f, 0.072f, 0.17f, 8).Translate(0, -0.06f, 0).Paint(TUNIC))
-                .Add(Geo.Cylinder(0.045f, 0.038f, 0.5f, 8).Translate(0, -0.36f, 0).Paint(SKIN))
+                .Add(Geo.Cylinder(0.066f, 0.058f, 0.6f, 8).Translate(0, -0.28f, 0).Paint(TUNIC))
+                .Add(Geo.Cylinder(0.06f, 0.06f, 0.05f, 8).Translate(0, -0.56f, 0).Paint(COLLAR))
                 .Add(Geo.Sphere(0.046f, 8, 6).Translate(0, -0.63f, 0).Paint(SKIN));
             g[ARM_L] = One(arm); g[ARM_R] = One(arm);
-            g[SHIELD] = One(new Geo()
-                .Add(Geo.Cylinder(0.42f, 0.42f, 1.08f, 10, true, -0.62f, 1.24f).Translate(0, 0, -0.42f).Paint(SHIELD_C))
-                .Add(Geo.Cylinder(0.424f, 0.424f, 0.035f, 10, true, -0.62f, 1.24f).Translate(0, 0.53f, -0.42f).Paint(GOLD))
-                .Add(Geo.Cylinder(0.424f, 0.424f, 0.035f, 10, true, -0.62f, 1.24f).Translate(0, -0.53f, -0.42f).Paint(GOLD))
-                .Add(Geo.Cylinder(0.423f, 0.423f, 0.05f, 10, true, -0.3f, 0.6f).Translate(0, 0, -0.42f).Paint(GOLD))
-                .Add(Geo.Sphere(0.075f, 10, 8).Scale(1, 1, 0.6f).Translate(0, 0, 0.01f).Paint(GOLD)));
-            g[PILUM] = One(new Geo()
-                .Add(Geo.Cylinder(0.015f, 0.015f, 1.35f, 6).Translate(0, 0.675f, 0).Paint(WOOD))
-                .Add(Geo.Box(0.05f, 0.12f, 0.05f).Translate(0, 1.36f, 0).Paint(WOOD))
-                .Add(Geo.Cylinder(0.005f, 0.009f, 0.62f, 5).Translate(0, 1.72f, 0).Paint(STEEL))
-                .Add(Geo.Cylinder(0.001f, 0.016f, 0.07f, 4).Translate(0, 2.06f, 0).Paint(STEEL)));
+            // belt kit on the back of the hips: gas-mask canister, bread bag, canteen and a rolled shelter quarter
+            g[KIT] = One(new Geo()
+                .Add(Geo.Cylinder(0.062f, 0.062f, 0.27f, 10).RotateZ(M.HALF_PI + 0.25f).Translate(0.02f, 0.0f, -0.2f).Paint(STEEL))
+                .Add(Geo.Box(0.2f, 0.19f, 0.07f).Translate(-0.14f, -0.14f, -0.17f).Paint(KIT_C))
+                .Add(Geo.Sphere(0.07f, 8, 6).Scale(1, 1.25f, 0.6f).Translate(0.14f, -0.15f, -0.18f).Paint(0x3a3324))
+                .Add(Geo.Cylinder(0.05f, 0.05f, 0.34f, 8).RotateZ(M.HALF_PI).Translate(0, 0.2f, -0.2f).Paint(KIT_C))
+                .Add(Geo.Box(0.07f, 0.1f, 0.05f).Translate(-0.12f, 0.03f, 0.185f).Paint(LEATHER))
+                .Add(Geo.Box(0.07f, 0.1f, 0.05f).Translate(0.12f, 0.03f, 0.185f).Paint(LEATHER)));
+            // bolt-action rifle, muzzle up, tilted a little across the back
+            Geo rifle = new Geo()
+                .Add(Geo.Box(0.05f, 0.34f, 0.11f).Translate(0, 0.17f, -0.012f).Paint(WOOD))            // butt
+                .Add(Geo.Box(0.045f, 0.5f, 0.055f).Translate(0, 0.58f, 0).Paint(WOOD))                  // fore-end
+                .Add(Geo.Cylinder(0.011f, 0.013f, 0.72f, 6).Translate(0, 0.74f, 0.02f).Paint(GUNMETAL))  // barrel
+                .Add(Geo.Box(0.03f, 0.12f, 0.05f).Translate(0, 0.38f, 0.01f).Paint(GUNMETAL))           // action
+                .Add(Geo.Cylinder(0.008f, 0.008f, 0.07f, 5).RotateZ(M.HALF_PI).Translate(0.04f, 0.4f, 0.01f).Paint(GUNMETAL))
+                .Add(Geo.Box(0.012f, 0.86f, 0.03f).Translate(0, 0.52f, 0.06f).Paint(LEATHER));          // sling
+            g[RIFLE] = One(rifle.RotateZ(0.14f));
             Geo leg = new Geo()
-                .Add(Geo.Cylinder(0.072f, 0.05f, 0.86f, 8).Translate(0, -0.44f, 0).Paint(SKIN))
-                .Add(Geo.Cylinder(0.056f, 0.06f, 0.24f, 8).Translate(0, -0.75f, 0).Paint(LEATHER))
-                .Add(Geo.Box(0.09f, 0.07f, 0.24f).Translate(0, -0.89f, 0.05f).Paint(LEATHER));
+                .Add(Geo.Cylinder(0.082f, 0.062f, 0.5f, 8).Translate(0, -0.26f, 0).Paint(TROUSER))
+                .Add(Geo.Cylinder(0.064f, 0.06f, 0.4f, 8).Translate(0, -0.68f, 0).Paint(LEATHER))        // jackboot
+                .Add(Geo.Box(0.09f, 0.07f, 0.25f).Translate(0, -0.895f, 0.05f).Paint(LEATHER));
             g[LEG_L] = One(leg); g[LEG_R] = One(leg);
             return g;
         }
         static Geo[] One(Geo g) { return new[] { g, g }; }
 
-        static Geo Body(bool centurion)
+        static Geo Body(bool officer)
         {
             Geo p = new Geo();
-            p.Add(Geo.Cylinder(0.17f, 0.225f, 0.4f, 12).Scale(1, 1, 0.8f).Translate(0, -0.15f, 0).Paint(TUNIC));
-            for (int i = 0; i < 6; i++) p.Add(Geo.Cylinder(0.2f + (i % 2) * 0.008f, 0.207f + (i % 2) * 0.008f, 0.074f, 14).Scale(1, 1, 0.78f).Translate(0, 0.085f + i * 0.078f, 0).Paint(STEEL));
+            p.Add(Geo.Cylinder(0.2f, 0.215f, 0.26f, 12).Scale(1, 1, 0.8f).Translate(0, -0.1f, 0).Paint(TUNIC));          // tunic skirt
+            p.Add(Geo.Cylinder(0.215f, 0.195f, 0.5f, 14).Scale(1, 1, 0.76f).Translate(0, 0.29f, 0).Paint(TUNIC));          // chest
             foreach (int s in new[] { -1, 1 })
             {
-                p.Add(Geo.Sphere(0.115f).Scale(1.15f, 0.5f, 1.05f).Translate(s * 0.235f, 0.52f, 0).Paint(STEEL));
-                p.Add(Geo.Sphere(0.1f).Scale(1.1f, 0.4f, 1.0f).Translate(s * 0.27f, 0.47f, 0).Paint(STEEL));
+                p.Add(Geo.Sphere(0.1f).Scale(1.1f, 0.55f, 1.0f).Translate(s * 0.215f, 0.5f, 0).Paint(TUNIC));                // shoulder
+                p.Add(Geo.Box(0.1f, 0.012f, 0.05f).Translate(s * 0.2f, 0.553f, 0).Paint(officer ? SILVER : COLLAR));        // shoulder strap
+                p.Add(Geo.Box(0.075f, 0.085f, 0.012f).Translate(s * 0.095f, 0.36f, 0.152f).Paint(COLLAR));                  // breast pocket flap
+                p.Add(Geo.Box(0.03f, 0.5f, 0.012f).RotateZ(-s * 0.2f).Translate(s * 0.1f, 0.3f, 0.158f).Paint(LEATHER));    // Y-strap
             }
-            p.Add(Geo.Cylinder(0.214f, 0.214f, 0.05f, 14).Scale(1, 1, 0.8f).Translate(0, 0.045f, 0).Paint(LEATHER));
-            for (int i = 0; i < 4; i++) p.Add(Geo.Box(0.026f, 0.2f, 0.012f).Translate(-0.06f + i * 0.04f, -0.08f, 0.175f).Paint(LEATHER));
-            p.Add(Geo.Sphere(0.03f, 8, 6).Scale(1, 1, 0.5f).Translate(0, 0.045f, 0.172f).Paint(BRONZE));
-            p.Add(Geo.Cylinder(0.05f, 0.058f, 0.09f, 8).Translate(0, 0.585f, 0).Paint(SKIN));
-            p.Add(Geo.Torus(0.066f, 0.026f, 6, 12).RotateX(M.HALF_PI).Translate(0, 0.565f, 0).Paint(TUNIC));
-            p.Add(Geo.Box(0.045f, 0.46f, 0.03f).RotateZ(0.12f).Translate(0.215f, -0.1f, -0.02f).Paint(LEATHER));
-            p.Add(Geo.Sphere(0.03f, 6, 5).Translate(0.245f, 0.15f, -0.02f).Paint(BRONZE));
-            if (centurion) p.Add(Geo.Box(0.44f, 0.82f, 0.03f).Translate(0, 0.16f, -0.185f).Paint(CLOAK));
+            p.Add(Geo.Cylinder(0.218f, 0.218f, 0.055f, 14).Scale(1, 1, 0.8f).Translate(0, 0.045f, 0).Paint(LEATHER));      // belt
+            p.Add(Geo.Box(0.06f, 0.05f, 0.012f).Translate(0, 0.045f, 0.176f).Paint(BUCKLE));
+            for (int i = 0; i < 5; i++) p.Add(Geo.Sphere(0.011f, 5, 4).Translate(0, 0.12f + i * 0.085f, 0.158f).Paint(BUCKLE));   // buttons
+            p.Add(Geo.Cylinder(0.05f, 0.058f, 0.09f, 8).Translate(0, 0.585f, 0).Paint(SKIN));                               // neck
+            p.Add(Geo.Torus(0.066f, 0.024f, 6, 12).RotateX(M.HALF_PI).Translate(0, 0.56f, 0).Paint(COLLAR));                 // collar
+            if (officer)
+            {
+                p.Add(Geo.Box(0.07f, 0.11f, 0.04f).Translate(0.2f, -0.02f, 0.06f).Paint(LEATHER));                           // pistol holster
+                p.Add(Geo.Box(0.028f, 0.5f, 0.012f).RotateZ(0.62f).Translate(0, 0.3f, 0.162f).Paint(LEATHER));                // cross strap
+                p.Add(Geo.Box(0.03f, 0.03f, 0.012f).Translate(0, 0.52f, 0.165f).Paint(SILVER));                             // medal at the throat
+            }
             return p;
         }
 
-        static Geo Helmet(bool centurion)
+        // The steel helmet: a round crown with a skirt flared over the ears and the neck, and a short peak.
+        static Geo Helmet()
         {
-            Geo m = new Geo()
-                .Add(Geo.Sphere(0.124f, 16, 8, 0, M.TAU, 0, M.PI * 0.55f).Translate(0, 0.105f, 0).Paint(STEEL))
-                .Add(Geo.Torus(0.124f, 0.011f, 5, 16).RotateX(M.HALF_PI).Translate(0, 0.118f, 0).Paint(BRONZE))
-                .Add(Geo.Cylinder(0.16f, 0.175f, 0.014f, 12, false, M.HALF_PI, M.PI).RotateX(-0.25f).Translate(0, 0.045f, -0.02f).Paint(STEEL))
-                .Add(Geo.Box(0.014f, 0.11f, 0.075f).Translate(0.108f, 0.04f, 0.04f).Paint(STEEL))
-                .Add(Geo.Box(0.014f, 0.11f, 0.075f).Translate(-0.108f, 0.04f, 0.04f).Paint(STEEL))
-                .Add(Geo.Box(0.2f, 0.018f, 0.03f).Translate(0, 0.135f, 0.115f).Paint(BRONZE));
-            Geo crest = Geo.Cylinder(0.2f, 0.2f, 0.03f, 16, false, 0, M.PI).RotateZ(M.HALF_PI);
-            if (centurion) crest.RotateY(M.HALF_PI);
-            m.Add(crest.Translate(0, 0.11f, 0).Paint(CREST));
-            return m;
+            return new Geo()
+                .Add(Geo.Sphere(0.128f, 16, 8, 0, M.TAU, 0, M.PI * 0.5f).Scale(1, 0.95f, 1.08f).Translate(0, 0.118f, -0.004f).Paint(STEEL))
+                .Add(Geo.Cylinder(0.129f, 0.158f, 0.06f, 16, true, M.HALF_PI, M.PI).Scale(1, 1, 1.08f).Translate(0, 0.09f, -0.004f).Paint(STEEL))     // skirt: sides and back
+                .Add(Geo.Cylinder(0.129f, 0.142f, 0.028f, 16, true, -M.HALF_PI, M.PI).Scale(1, 1, 1.08f).Translate(0, 0.106f, -0.004f).Paint(STEEL))   // peak: front
+                .Add(Geo.Box(0.012f, 0.1f, 0.012f).Translate(0.1f, 0.03f, 0.03f).Paint(LEATHER))
+                .Add(Geo.Box(0.012f, 0.1f, 0.012f).Translate(-0.1f, 0.03f, 0.03f).Paint(LEATHER));
+        }
+
+        // The officer's peaked cap.
+        static Geo Cap()
+        {
+            return new Geo()
+                .Add(Geo.Cylinder(0.118f, 0.112f, 0.05f, 16).Translate(0, 0.165f, 0).Paint(CAP_BAND))
+                .Add(Geo.Cylinder(0.158f, 0.12f, 0.055f, 16).Scale(1, 1, 1.05f).RotateX(-0.16f).Translate(0, 0.215f, 0.004f).Paint(TUNIC))
+                .Add(Geo.Cylinder(0.158f, 0.158f, 0.012f, 16).Scale(1, 1, 1.05f).RotateX(-0.16f).Translate(0, 0.247f, 0.0f).Paint(TUNIC))
+                .Add(Geo.Cylinder(0.13f, 0.13f, 0.01f, 12, false, -0.9f, 1.8f).Scale(1, 1, 1.25f).RotateX(0.3f).Translate(0, 0.142f, 0.012f).Paint(LEATHER))   // visor
+                .Add(Geo.Box(0.03f, 0.025f, 0.01f).Translate(0, 0.225f, 0.13f).Paint(SILVER));
         }
     }
 
-    // The garrison: patrol routes on the wall-walks, the Senate roof, the gate, the road, the bridge and the camp.
-    public sealed class Legion
+    // The garrison: patrol routes on the wall-walks, the keep roof, the gate, the road, the bridge and the camp.
+    public sealed class Garrison
     {
         public readonly List<Soldier> Soldiers = new List<Soldier>();
         public float AlertLevel, AlarmT; public bool Alarm; public Action OnAlarm; public int Total;
@@ -307,7 +327,7 @@ namespace PaxRomana
             return so;
         }
 
-        public Legion(Castle castle)
+        public Garrison(Castle castle)
         {
             float W = Config.WALK_Y, CX = Config.CAMP_X, CZ = Config.CAMP_Z, CR = Config.CAMP_R;
             // wall-walks
@@ -324,7 +344,7 @@ namespace PaxRomana
             Add(new Route(Pts(0.8f, 38.4f, 4, 38.4f), false, gt), 1.97f, 0, true, 0);
             Add(new Route(Pts(-3.6f, 42, -3.6f, 47)), 0, 0, true, 0);
             Add(new Route(Pts(3.6f, 42, 3.6f, 47)), 0, 0, true, 0);
-            // Senate roof
+            // keep roof
             float kx = castle.KeepX, kz = castle.KeepZ, o = castle.KeepHalf - 1.6f;
             Route loop = new Route(Pts(kx - o, kz + o, kx + o, kz + o, kx + o, kz - o, kx - o, kz - o), true, castle.KeepTop);
             Add(loop, 3, 0, false, 0, false, 1.0f); Add(loop, 3 + loop.Total / 2, 0, false, 0, false, 1.0f);
@@ -333,7 +353,7 @@ namespace PaxRomana
             Add(road, 30, 0.7f); Add(road, 30, -0.7f);
             // bridge sentry
             Add(new Route(Pts(Config.BRIDGE_X, Config.BRIDGE_Z0 + 14, Config.BRIDGE_X, Config.BRIDGE_Z1 - 14), false, Config.BRIDGE_Y), 10);
-            // a contubernium drilling around the camp, centurion at its head
+            // a section drilling around the camp, the officer at its head
             float[] ring = new float[96];
             for (int i = 0; i < 48; i++) { float a = -(i / 48f) * M.TAU; ring[i * 2] = CX + M.Sin(a) * (CR + 13); ring[i * 2 + 1] = CZ + M.Cos(a) * (CR + 13); }
             Route drill = new Route(Pts(ring), true);
@@ -342,11 +362,11 @@ namespace PaxRomana
             // watchtower lookout
             float tx = CX + 26, tz = CZ + 34;
             Add(new Route(Pts(tx - 1.1f, tz + 1.1f, tx + 1.1f, tz + 1.1f), false, Terrain.GroundAt(tx, tz) + 7.12f), 1, 0, true, 0.3f);
-            // camp: two by the fire, one walking the via principalis
+            // camp: two by the fire, one walking the main lane
             Add(new Route(Pts(CX + 7.6f, CZ + 7.5f, CX + 12, CZ + 16)), 0, 0, true, -2.3f);
             Add(new Route(Pts(CX + 4.6f, CZ + 4.6f, CX - 3, CZ + 20)), 0, 0, true, 0.8f);
             Add(new Route(Pts(CX, CZ + 40, CX, CZ - 30)), 20);
-            // inside the walls: a sentry crossing the courtyard and the vault guard in the Senate
+            // inside the walls: a sentry crossing the courtyard and the guard outside the vault in the keep
             Add(new Route(Pts(-24, 26, 24, 26)), 14);
             Add(new Route(Pts(4.5f, -6.5f, -3, -6.5f)), 0, 0, true, 0);
             Total = Soldiers.Count;
