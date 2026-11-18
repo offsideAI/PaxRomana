@@ -21,7 +21,7 @@ jobs:
         shell: powershell
         run: dotnet run -c Release --project PaxRomana-XBOX-CSharp-src\tests\PaxRomana.Tests.csproj
 
-      # Signs with a throwaway certificate and runs MSBuild (.NET Native, x64).
+      # Signs with a throwaway certificate and runs MSBuild (x64, without .NET Native: see the project file).
       - name: Build package
         shell: powershell
         run: .\PaxRomana-XBOX-CSharp-src\build.ps1

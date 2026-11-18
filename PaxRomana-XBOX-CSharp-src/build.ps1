@@ -5,6 +5,8 @@
 #
 # Needs Visual Studio 2022 with the "Universal Windows Platform development" workload. Nothing else: no Node.js,
 # no content pipeline. Output: .\package\PaxRomanaNative_<version>_x64_Test\  (the .msix plus Dependencies\x64)
+# The project builds without .NET Native (see the comment in the project file), so the package carries the game's
+# managed assemblies and depends on the .NET Core runtime packages in Dependencies\x64.
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
 

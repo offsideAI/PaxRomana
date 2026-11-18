@@ -44,7 +44,12 @@
     <UseVSHostingProcess>false</UseVSHostingProcess>
     <ErrorReport>prompt</ErrorReport>
     <Prefer32Bit>true</Prefer32Bit>
-    <UseDotNetNativeToolchain>true</UseDotNetNativeToolchain>
+    <!-- .NET Native is off on purpose. With it on, the compiled game binary lists the system libraries SharpDX can
+         call (among them xaudio2_8.dll, the Windows 8 audio library, and mf.dll) as load-time requirements, and the
+         console refused to start the app at all (error 0x80070002, before any of our code ran). Without it the
+         libraries are looked up only when first used, where a missing one is handled. The package is larger and
+         depends on the .NET Core runtime framework packages; that is fine for sideloading in Developer Mode. -->
+    <UseDotNetNativeToolchain>false</UseDotNetNativeToolchain>
   </PropertyGroup>
   <ItemGroup>
     <!-- the game: every C# file under Game, shared with the desktop build and the tests -->

@@ -466,7 +466,7 @@ If the game shows its error screen instead, the text on it is the bug report.
 | --- | --- | --- |
 | Language | C# 7.3 | The highest version the UWP toolchain supports |
 | Framework | [MonoGame](https://monogame.net) 3.8.1.303 ([source](https://github.com/MonoGame/MonoGame), [docs](https://docs.monogame.net), Ms-PL licence) | The lightest C# option that runs on Xbox in Developer Mode |
-| Xbox target | `MonoGame.Framework.WindowsUniversal` (Direct3D 11 through SharpDX, XAudio2, `Windows.Gaming.Input`), UWP, .NET Native in Release | |
+| Xbox target | `MonoGame.Framework.WindowsUniversal` (Direct3D 11 through SharpDX, XAudio2, `Windows.Gaming.Input`), UWP, built without .NET Native (see 10.14) | |
 | Desktop and tests | `MonoGame.Framework.DesktopGL` on .NET 8 or newer | Same game code, runs anywhere |
 | Shaders | `BasicEffect` and `AlphaTestEffect` only | Built into MonoGame: nothing to compile |
 | Assets | None | Everything is generated in code |
@@ -704,7 +704,7 @@ prints average update and draw times, and exits by itself. It is the way to chec
 2. Creates a self-signed certificate `paxromana-sideload.pfx` with subject `CN=PaxRomana` if it is missing. The
    subject must match `Publisher` in `Package.appxmanifest`. The certificate is throwaway, its password is in the
    script, and `*.pfx` is git-ignored.
-3. Runs MSBuild on `xbox\PaxRomanaNative\PaxRomanaNative.csproj`: Release, x64, .NET Native, sideload package, no
+3. Runs MSBuild on `xbox\PaxRomanaNative\PaxRomanaNative.csproj`: Release, x64, without .NET Native, sideload package, no
    bundle. Output goes to `package\PaxRomanaNative_<version>_x64_Test\` with a `Dependencies\x64` folder.
 
 The UWP project is an old-style `.csproj` with `PackageReference` items for
@@ -785,7 +785,7 @@ APIs that compile on .NET 8 but not for the console, which would otherwise surfa
 | C# newer than 7.3, or APIs newer than .NET Standard 2.0 | They build on the desktop and fail in the UWP build. `tools/apicheck` catches them. |
 | Back-buffer multisampling | Never set `PreferMultiSampling = true`: MonoGame's UWP swap chain creation fails with it. |
 | `--` inside XML comments | Invalid XML; MSBuild reports MSB4025. It is easy to write when quoting `dotnet run -- …` in a project file. |
-| Reflection under .NET Native | Release builds strip metadata. The game uses no reflection or serialisation; keep it that way, or add directives to `Properties/Default.rd.xml`. |
+| .NET Native | Off for the Xbox build since 2026-11-18. With it on, the compiled binary required `xaudio2_8.dll`, `mf.dll` and six other system libraries at load time (WSBX, which starts fine, requires none of them), and the console refused to start the app with 0x80070002 before any game code ran. Whether a missing library is the cause was not yet confirmed on the console when this was written; `startup.log` now records which of those libraries exist. If it is turned back on, Release builds strip metadata: the game uses no reflection or serialisation, so keep it that way or add directives to `Properties/Default.rd.xml`. |
 | Device access from the loader thread | `World.Build` and `Synth.RenderAll` run on a background thread and must not touch `GraphicsDevice` or create `SoundEffect` objects. Uploads happen in `Renderer.SetWorld` and `SynthAudio`'s constructor on the main thread. |
 | Removing a kill-cam round early | Ending the kill-cam must only clear `Bullet.Cam`. Removing the bullet cancels the kill. The test covers this. |
 | Unseeded chance in tests | The kill-cam is random; tests set `AlwaysKillCam` to make it deterministic. |

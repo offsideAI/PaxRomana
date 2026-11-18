@@ -3,6 +3,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Windows.ApplicationModel.Core;
 using Windows.Graphics.Display;
@@ -41,6 +42,29 @@ namespace PaxRomanaNative
             Write("launch at " + DateTime.UtcNow.ToString("u") + " on " + where + " " + version);
         }
 
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true, ExactSpelling = true)]
+        static extern IntPtr LoadLibraryExW(string name, IntPtr reserved, uint flags);
+
+        // Records which of the system libraries the graphics and audio layer can call are on this console. A build
+        // compiled with .NET Native needs every one of them to exist before the app can start at all, so this is
+        // the list to check before turning .NET Native back on.
+        public static void ProbeSystemLibraries()
+        {
+            const uint SEARCH_SYSTEM32 = 0x800;
+            string found = "", missing = "";
+            foreach (string name in new[] { "d3d11.dll", "dxgi.dll", "d2d1.dll", "dwrite.dll", "xaudio2_9.dll", "xaudio2_8.dll", "mfplat.dll", "mfreadwrite.dll", "mf.dll", "xinput1_4.dll" })
+            {
+                try
+                {
+                    if (LoadLibraryExW(name, IntPtr.Zero, SEARCH_SYSTEM32) != IntPtr.Zero) found += " " + name;
+                    else missing += " " + name + " (error " + Marshal.GetLastWin32Error() + ")";
+                }
+                catch (Exception e) { missing += " " + name + " (" + e.GetType().Name + ")"; }
+            }
+            Write("system libraries present:" + (found.Length > 0 ? found : " none"));
+            Write("system libraries missing:" + (missing.Length > 0 ? missing : " none"));
+        }
+
         public static void Write(string line)
         {
             if (path == null) return;
@@ -57,6 +81,7 @@ namespace PaxRomanaNative
         {
             StartupLog.Begin();
             PaxRomana.PaxGame.Log = StartupLog.Write;
+            try { StartupLog.ProbeSystemLibraries(); } catch (Exception e) { StartupLog.Write("could not check the system libraries: " + e); }
             // Whatever goes wrong outside the game's own error handling ends up in the diary before the app closes.
             try
             {
