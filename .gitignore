@@ -36,3 +36,13 @@ Thumbs.db
 
 # Claude Code local settings
 .claude/settings.local.json
+
+# WSBX (Xbox / UWP) build output and downloaded packages
+WSBX-src/**/bin/
+WSBX-src/**/obj/
+WSBX-src/**/AppPackages/
+WSBX-src/**/BundleArtifacts/
+WSBX-src/package/
+.vs/
+*.csproj.user
+*.pfx

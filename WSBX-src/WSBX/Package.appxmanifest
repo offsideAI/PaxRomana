@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  IgnorableNamespaces="uap mp">
+
+  <!-- Publisher must match the subject of the signing certificate (see build.ps1). -->
+  <Identity Name="WSBX.Pong" Publisher="CN=WSBX" Version="1.0.0.0" />
+  <mp:PhoneIdentity PhoneProductId="6f2b1c4e-3a57-4d0b-9e21-8c5d7a1f4b90" PhonePublisherId="00000000-0000-0000-0000-000000000000" />
+
+  <Properties>
+    <DisplayName>WSBX</DisplayName>
+    <PublisherDisplayName>WSBX</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Universal" MinVersion="10.0.17763.0" MaxVersionTested="10.0.22621.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="x-generate" />
+  </Resources>
+
+  <Applications>
+    <Application Id="App" Executable="$targetnametoken$.exe" EntryPoint="WSBX.App">
+      <uap:VisualElements
+        DisplayName="WSBX"
+        Description="Two-player Pong for Xbox controllers"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png"
+        BackgroundColor="#0B1020">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
+        <uap:SplashScreen Image="Assets\SplashScreen.png" BackgroundColor="#0B1020" />
+      </uap:VisualElements>
+    </Application>
+  </Applications>
+</Package>
