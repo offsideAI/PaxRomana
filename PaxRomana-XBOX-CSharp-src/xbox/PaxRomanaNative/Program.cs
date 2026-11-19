@@ -3,11 +3,11 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Windows.ApplicationModel.Core;
 using Windows.Graphics.Display;
-using Windows.Storage;
 using Windows.System.Profile;
 using Windows.UI.Core;
 using Windows.UI.ViewManagement;
@@ -17,29 +17,57 @@ namespace PaxRomanaNative
     // A diary of the launch, written to startup.log in the app's local data folder, where the Xbox Device Portal can
     // read it (scripts/xbox-diagnose.sh fetches it). If the game stops before it can draw its own error screen, this
     // file says how far it got and why it stopped. It is rewritten on every launch.
+    //
+    // Nothing in this class may depend on MonoGame or on the game: it has to work even when those cannot be loaded.
     static class StartupLog
     {
         static readonly object gate = new object();
         static readonly Stopwatch clock = Stopwatch.StartNew();
         static string path;
+        static int firstChance;
+        [ThreadStatic] static bool writing;
 
+        // Finds somewhere writable. The usual place is the app's LocalState folder; the others are fallbacks, so that
+        // a failure of one way of finding it does not leave the launch without a record.
         public static void Begin()
+        {
+            string problems = "";
+            for (int attempt = 0; attempt < 3 && path == null; attempt++)
+            {
+                try
+                {
+                    string folder = attempt == 0 ? LocalStateFolder()
+                        : attempt == 1 ? Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)
+                        : Path.GetTempPath();
+                    string candidate = Path.Combine(folder, "startup.log");
+                    File.WriteAllText(candidate, "");
+                    path = candidate;
+                }
+                catch (Exception e) { problems += " [" + attempt + ": " + e.GetType().Name + " " + e.Message + "]"; }
+            }
+            Write("launch at " + DateTime.UtcNow.ToString("u") + ", log at " + path + (problems.Length > 0 ? ", earlier attempts failed:" + problems : ""));
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static string LocalStateFolder() { return Windows.Storage.ApplicationData.Current.LocalFolder.Path; }
+
+        // What is running, and where: the package version tells one build from the next.
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static void Describe()
         {
             try
             {
-                path = Path.Combine(ApplicationData.Current.LocalFolder.Path, "startup.log");
-                File.WriteAllText(path, "");
+                Windows.ApplicationModel.PackageVersion v = Windows.ApplicationModel.Package.Current.Id.Version;
+                Write("package " + Windows.ApplicationModel.Package.Current.Id.FullName + ", version " + v.Major + "." + v.Minor + "." + v.Build + "." + v.Revision);
             }
-            catch (Exception) { path = null; }
-            string where = "?", version = "?";
-            try { where = AnalyticsInfo.VersionInfo.DeviceFamily; } catch (Exception) { }
+            catch (Exception e) { Write("could not read the package identity: " + e.GetType().Name + " " + e.Message); }
             try
             {
-                ulong v = ulong.Parse(AnalyticsInfo.VersionInfo.DeviceFamilyVersion);
-                version = (v >> 48) + "." + ((v >> 32) & 0xFFFF) + "." + ((v >> 16) & 0xFFFF) + "." + (v & 0xFFFF);
+                ulong n = ulong.Parse(AnalyticsInfo.VersionInfo.DeviceFamilyVersion);
+                Write("device " + AnalyticsInfo.VersionInfo.DeviceFamily + " " + (n >> 48) + "." + ((n >> 32) & 0xFFFF) + "." + ((n >> 16) & 0xFFFF) + "." + (n & 0xFFFF)
+                    + ", runtime " + RuntimeInformation.FrameworkDescription + ", " + (IntPtr.Size * 8) + "-bit");
             }
-            catch (Exception) { }
-            Write("launch at " + DateTime.UtcNow.ToString("u") + " on " + where + " " + version);
+            catch (Exception e) { Write("could not read the device details: " + e.GetType().Name + " " + e.Message); }
         }
 
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true, ExactSpelling = true)]
@@ -48,6 +76,7 @@ namespace PaxRomanaNative
         // Records which of the system libraries the graphics and audio layer can call are on this console. A build
         // compiled with .NET Native needs every one of them to exist before the app can start at all, so this is
         // the list to check before turning .NET Native back on.
+        [MethodImpl(MethodImplOptions.NoInlining)]
         public static void ProbeSystemLibraries()
         {
             const uint SEARCH_SYSTEM32 = 0x800;
@@ -65,41 +94,51 @@ namespace PaxRomanaNative
             Write("system libraries missing:" + (missing.Length > 0 ? missing : " none"));
         }
 
+        // Every exception as it is thrown, including the ones that are caught and handled, up to a limit. This is
+        // what names the file when something reports "file not found".
+        public static void FirstChance(Exception e)
+        {
+            if (writing || firstChance >= 40) return;
+            firstChance++;
+            string text;
+            try { text = e.ToString(); } catch (Exception) { text = e.GetType().FullName; }
+            FileNotFoundException missing = e as FileNotFoundException;
+            if (missing != null) text = "[file: " + missing.FileName + "] " + text;
+            Write("exception " + firstChance + " (0x" + e.HResult.ToString("X8") + "): " + (text.Length > 1500 ? text.Substring(0, 1500) : text));
+        }
+
         public static void Write(string line)
         {
-            if (path == null) return;
+            if (path == null || writing) return;
             lock (gate)
             {
+                writing = true;
                 try { File.AppendAllText(path, (clock.ElapsedMilliseconds / 1000.0).ToString("0.000") + "  " + line + "\r\n"); } catch (Exception) { }
+                writing = false;
             }
         }
     }
 
     public static class Program
     {
+        // Main itself touches nothing but the diary, so that a problem loading MonoGame or the game shows up as an
+        // entry in the diary instead of stopping the program before its first line.
         static void Main()
         {
             StartupLog.Begin();
-            PaxRomana.PaxGame.Log = StartupLog.Write;
+            try { AppDomain.CurrentDomain.FirstChanceException += (s, e) => StartupLog.FirstChance(e.Exception); }
+            catch (Exception e) { StartupLog.Write("no first-chance exception reports: " + e.GetType().Name); }
+            try { AppDomain.CurrentDomain.UnhandledException += (s, e) => StartupLog.Write("UNHANDLED: " + e.ExceptionObject); }
+            catch (Exception e) { StartupLog.Write("no unhandled exception reports: " + e.GetType().Name); }
+            try { TaskScheduler.UnobservedTaskException += (s, e) => StartupLog.Write("UNOBSERVED TASK ERROR: " + e.Exception); }
+            catch (Exception) { }
+            try { StartupLog.Describe(); } catch (Exception e) { StartupLog.Write("could not describe the app: " + e); }
             try { StartupLog.ProbeSystemLibraries(); } catch (Exception e) { StartupLog.Write("could not check the system libraries: " + e); }
-            // Whatever goes wrong outside the game's own error handling ends up in the diary before the app closes.
-            try
-            {
-                AppDomain.CurrentDomain.UnhandledException += (s, e) => StartupLog.Write("UNHANDLED: " + e.ExceptionObject);
-                TaskScheduler.UnobservedTaskException += (s, e) => StartupLog.Write("UNOBSERVED TASK ERROR: " + e.Exception);
-                CoreApplication.UnhandledErrorDetected += (s, e) =>
-                {
-                    try { e.UnhandledError.Propagate(); }
-                    catch (Exception ex) { StartupLog.Write("UNHANDLED (app model): " + ex); throw; }
-                };
-            }
-            catch (Exception e) { StartupLog.Write("could not attach the error handlers: " + e); }
 
             try
             {
-                var factory = new MonoGame.Framework.GameFrameworkViewSource<XboxGame>();
-                StartupLog.Write("starting the app view");
-                CoreApplication.Run(factory);
+                StartupLog.Write("loading the game");
+                RunGame();
                 StartupLog.Write("the app view returned (normal exit)");
             }
             catch (Exception e)
@@ -107,6 +146,25 @@ namespace PaxRomanaNative
                 StartupLog.Write("STOPPED: " + e);
                 throw;
             }
+        }
+
+        // Kept out of Main (never inlined) so that MonoGame and the game are only loaded once the diary is open.
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void RunGame()
+        {
+            PaxRomana.PaxGame.Log = StartupLog.Write;
+            try
+            {
+                CoreApplication.UnhandledErrorDetected += (s, e) =>
+                {
+                    try { e.UnhandledError.Propagate(); }
+                    catch (Exception ex) { StartupLog.Write("UNHANDLED (app model): " + ex); throw; }
+                };
+            }
+            catch (Exception e) { StartupLog.Write("could not attach the app-model error handler: " + e.GetType().Name); }
+            var factory = new MonoGame.Framework.GameFrameworkViewSource<XboxGame>();
+            StartupLog.Write("starting the app view");
+            CoreApplication.Run(factory);
         }
     }
 

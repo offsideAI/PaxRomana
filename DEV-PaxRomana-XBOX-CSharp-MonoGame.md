@@ -172,7 +172,7 @@ control) is tabulated in the PRD, section 10.13.
 | `deploy.sh` cannot connect | Check the address in Dev Home, that the Device Portal is enabled, and that the Mac is on the same network. |
 | `deploy.sh` reports 401 or asks for credentials | Wrong portal user name or password. |
 | `deploy.sh` says no package found | Delete `./package` and run it again. If the download itself fails, the artifact may have expired; start a new build. |
-| The console still runs the old build | `./package` held the old one. `rm -rf package` and install again. |
+| The console still runs the old build | `./package` held the old one. `rm -rf package` and install again. Each build now has its own version (1.0.*run number*.0), and `deploy.sh` asks the console which version it has after installing and stops with "NOT UPDATED" if it is not the one just sent. |
 | The install is refused over an existing version | Each build is signed with a newly generated certificate. Uninstall the app in Dev Home, then install again. |
 | The game shows an error screen | Copy the text; it names the failing file and method. |
 | The console refuses to start the app (for example "Sorry, that didn't work", 0x80070002) | Run `scripts/xbox-diagnose.sh` from the repo root with the same three variables as `deploy.sh`. It only reads: the installed package, whether the process is running, crash dumps, and `startup.log`, the diary the game writes while it starts (how far it got and any error). Add `--launch` to have the console start the app first. |

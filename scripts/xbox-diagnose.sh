@@ -76,7 +76,15 @@ for p in found:
     print("PRAID=" + p.get("PackageRelativeId", ""))
     for k in ("Name", "PackageFullName", "PackageFamilyName", "PackageRelativeId", "Version", "PackageOrigin", "Publisher", "IsXAP", "CanUninstall"):
         if k in p:
-            print("   %-18s %s" % (k, p[k]))
+            v = p[k]
+            if k == "Version" and isinstance(v, dict):
+                v = "%s.%s.%s.%s" % (v.get("Major"), v.get("Minor"), v.get("Build"), v.get("Revision"))
+            print("   %-18s %s" % (k, v))
+print("runtime packages on the console:")
+for p in data.get("InstalledPackages", []):
+    full = p.get("PackageFullName", "")
+    if any(t in full for t in ("NET.Native", "NET.Core", "VCLibs", "UI.Xaml")):
+        print("   ", full)
 PY
   grep -v -E '^(FULL|PRAID)=' "$TMP/pkg.txt"
   FULL="$(grep '^FULL=' "$TMP/pkg.txt" | head -n 1 | cut -d= -f2-)"
@@ -138,32 +146,37 @@ if [ -n "$FULL" ]; then
 fi
 get wer /api/wer/reports && show wer 2500
 
-section "The app's local data folder and startup.log"
+section "The app's data folders and startup.log"
 if [ -n "$FULL" ]; then
   GOT=0
-  for P in '%5C%5CLocalState' '%5CLocalState' 'LocalState'; do
+  # the log is normally in LocalState; the app falls back to other folders if it cannot write there
+  for P in '%5C%5CLocalState' '%5C%5CTempState' '%5C%5CAC%5C%5CTemp' '%5C%5CAC' ''; do
+    echo "folder: $(python3 -c 'import sys,urllib.parse;print(urllib.parse.unquote(sys.argv[1]) or "(root)")' "$P")"
     if get files "/api/filesystem/apps/files?knownfolderid=LocalAppData&packagefullname=$ENC_FULL&path=$P"; then
       python3 - "$TMP/files" <<'PY'
 import json, sys
 try:
-    for f in json.load(open(sys.argv[1], encoding="utf-8-sig")).get("Items", []):
-        print("    %-28s %10s bytes" % (f.get("Name"), f.get("FileSize")))
+    items = json.load(open(sys.argv[1], encoding="utf-8-sig")).get("Items", [])
+    if not items:
+        print("    (empty)")
+    for f in items[:40]:
+        print("    %-34s %10s bytes" % (f.get("Name"), f.get("FileSize")))
 except Exception as e:
     print(open(sys.argv[1], errors="replace").read()[:600])
 PY
-      if get log "/api/filesystem/apps/file?knownfolderid=LocalAppData&filename=startup.log&packagefullname=$ENC_FULL&path=$P"; then
-        GOT=1
-        echo "----- startup.log -----"
-        cat "$TMP/log"
-        echo "----- end of startup.log -----"
+      if [ "$GOT" = "0" ] && grep -q '"startup.log"' "$TMP/files" 2>/dev/null; then
+        if get log "/api/filesystem/apps/file?knownfolderid=LocalAppData&filename=startup.log&packagefullname=$ENC_FULL&path=$P"; then
+          GOT=1
+          echo "----- startup.log -----"
+          cat "$TMP/log"
+          echo "----- end of startup.log -----"
+        fi
       fi
-      break
     fi
   done
   if [ "$GOT" = "0" ]; then
-    echo "No startup.log. Either this build is older than the one that writes it, or the app never got as far as"
-    echo "running its own code (the log is created by the first line of the program)."
-    show log 400
+    echo "No startup.log anywhere. Either the installed build is older than the one that writes it (check the"
+    echo "version above), or the app did not get as far as running its own code."
   fi
 else
   echo "skipped: the package was not found"

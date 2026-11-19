@@ -31,16 +31,33 @@ if (-not (Test-Path $pfx)) {
     Write-Host "Created signing certificate $pfx"
 }
 
-# 3. Package.
+# 3. Give this build its own version number. The console treats a package with the same name and version as already
+#    installed, so without this a new build can be accepted and yet leave the old one in place. On GitHub the third
+#    part is the run number; on a PC it is the number of hours since the start of 2026. The manifest in the source
+#    tree is put back afterwards.
+$manifest = Join-Path $PSScriptRoot 'xbox\PaxRomanaNative\Package.appxmanifest'
+$original = [System.IO.File]::ReadAllText($manifest)
+$build = if ($env:GITHUB_RUN_NUMBER) { [int]$env:GITHUB_RUN_NUMBER } else { [int]([datetime]::UtcNow - [datetime]'2026-01-01').TotalHours }
+$version = "1.0.$build.0"
+$stamped = [regex]::Replace($original, '(<Identity\b[^>]*\bVersion=")[^"]*', ('${1}' + $version))
+if ($stamped -eq $original) { throw 'Could not find the Identity Version in Package.appxmanifest.' }
+[System.IO.File]::WriteAllText($manifest, $stamped, (New-Object System.Text.UTF8Encoding($false)))
+Write-Host "Package version: $version"
+
+# 4. Package.
 $out = Join-Path $PSScriptRoot 'package'
 if (Test-Path $out) { Remove-Item $out -Recurse -Force }
 
+try {
 & $msbuild 'xbox\PaxRomanaNative\PaxRomanaNative.csproj' /restore /m /v:minimal `
     /p:Configuration=Release /p:Platform=x64 `
     /p:GenerateAppxPackageOnBuild=true /p:AppxBundle=Never /p:UapAppxPackageBuildMode=SideloadOnly `
     "/p:AppxPackageDir=$out\" `
     /p:AppxPackageSigningEnabled=true "/p:PackageCertificateKeyFile=$pfx" "/p:PackageCertificatePassword=$pfxPassword" /p:PackageCertificateThumbprint=
 if ($LASTEXITCODE -ne 0) { throw "Build failed (exit code $LASTEXITCODE)" }
+} finally {
+    [System.IO.File]::WriteAllText($manifest, $original, (New-Object System.Text.UTF8Encoding($false)))
+}
 
 Write-Host ''
 Write-Host 'Package files:'
