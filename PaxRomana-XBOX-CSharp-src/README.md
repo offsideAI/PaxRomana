@@ -41,12 +41,13 @@ to be compiled or loaded from files:
 
 | Input | Action |
 | --- | --- |
-| Left stick / click it | Move / sprint |
+| Left stick | Move |
+| LB (hold), or click the left stick | Run. Raising the scope ends the run; from a crouch or prone it stands you up |
 | Right stick | Look and aim (slows near a target and through the scope) |
 | LT (hold) | Scope |
 | RT | Fire the rifle |
 | RB | Fire an explosive charge |
-| LB | Hold breath (scoped) |
+| LB (hold, while scoped) | Hold breath |
 | D-pad up / down, or Y | Zoom |
 | D-pad left / right | Sight zero, 100 to 600 m |
 | X | Reload |

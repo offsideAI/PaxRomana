@@ -58,6 +58,7 @@ namespace PaxRomana
         public Vector3 Pos;
         public bool OnBridge, Swimming, Enabled, Scoped, Holding, Sprinting; public float Depth;
         public bool AlwaysSteady;          // no scope sway (used by the tests and the visual check)
+        public bool Aiming;                // the scope is being raised or is up: aiming always wins over running
         public float Yaw, Pitch = -0.1f, Eye = EYE[0], Kick, KickYaw, Breath = 1, Exhausted, Zoom = 8, Bob, MoveAmt, AimSlow = 1, Shake, T;
         public int Stance;
         public Action OnEdge, OnHeartbeat;
@@ -151,9 +152,14 @@ namespace PaxRomana
 
                 float f = (km.IsDown(K.W) ? 1 : 0) - (km.IsDown(K.S) ? 1 : 0), s = (km.IsDown(K.D) ? 1 : 0) - (km.IsDown(K.A) ? 1 : 0), analog = 1;
                 if (f == 0 && s == 0 && (lsx != 0 || lsy != 0)) { f = -lsy; s = lsx; analog = Math.Min(1, M.Hypot(f, s)); }
-                if (pad.Pressed(Btn.L3)) padSprint = true;                     // click the left stick to sprint
-                if (analog < 0.6f || f <= 0) padSprint = false;
-                bool sprint = (km.IsDown(K.Shift) || padSprint) && !Scoped && Stance == 0 && f > 0;
+                // Running: hold LB, or click the left stick and keep pushing forward (the usual shooter layout), or hold
+                // Shift. Asking to run from a crouch or from prone stands you up first. Raising the scope ends the run,
+                // and with the scope up LB holds your breath instead.
+                if (pad.Pressed(Btn.L3)) padSprint = true;
+                if (analog < 0.6f || f <= 0 || Aiming) padSprint = false;
+                bool wantRun = (km.IsDown(K.Shift) || padSprint || pad.Down(Btn.LB)) && !Scoped && !Aiming && f > 0 && !Swimming;
+                if (wantRun && Stance != 0) Stance = 0;
+                bool sprint = wantRun && Stance == 0;
                 float wet = M.Clamp((Depth - 0.3f) / 1.0f);                     // wading slows you, swimming more so
                 float sp = SPEED[Stance] * (sprint && wet == 0 ? 1.6f : 1) * (Scoped ? 0.35f : 1) * (1 - 0.58f * wet) * analog;
                 float l = M.Hypot(f, s);

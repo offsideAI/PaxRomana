@@ -311,12 +311,13 @@ namespace PaxRomana
 
         static readonly string[][] KeyRows =
         {
-            new[] { "Move / sprint", "Left stick / click it", "W A S D / Shift" },
+            new[] { "Move", "Left stick", "W A S D" },
+            new[] { "Run (hold)", "LB, or click left stick", "Shift" },
             new[] { "Look / aim", "Right stick", "Mouse or arrows" },
             new[] { "Scope", "LT (hold)", "Right button or F" },
             new[] { "Fire rifle", "RT", "Left button or Space" },
             new[] { "Fire explosive charge", "RB", "Middle button or G" },
-            new[] { "Hold breath", "LB", "Shift" },
+            new[] { "Hold breath (scoped)", "LB", "Shift" },
             new[] { "Zoom", "D-pad up / down, or Y", "Wheel or + / −" },
             new[] { "Sight zero", "D-pad left / right", "Q / E" },
             new[] { "Reload", "X", "R" },
@@ -381,7 +382,7 @@ namespace PaxRomana
             ly += Rich("<b>Take the keys.</b> Clear every defender inside the castle walls, then crack the strongbox in the vault of the keep.", colL, ly, 16 * U, colW, 23 * U, body, Bone) + 8 * U;
             ly += Rich("Your rifle fires sniper rounds and <b>explosive charges</b>. A charge kills everything near it and blows doors and the gate off their hinges.", colL, ly, 16 * U, colW, 23 * U, body, Bone);
             string[] list = hud.IsPad
-                ? new[] { "<k>LT</k> scope <k>RT</k> fire <k>RB</k> explosive", "<k>LB</k> hold breath <k>X</k> reload", "<k>A</k> doors <k>B</k> crouch", "D-pad zoom and zero", "<k>View</k> all controls <k>Menu</k> pause" }
+                ? new[] { "<k>LT</k> scope <k>RT</k> fire <k>RB</k> explosive", "<k>LB</k> run · hold breath <k>X</k> reload", "<k>A</k> doors <k>B</k> crouch", "D-pad zoom and zero", "<k>View</k> all controls <k>Menu</k> pause" }
                 : new[] { "Mouse aim <k>WASD</k> move", "LMB fire <k>G</k> explosive RMB scope", "Wheel zoom <k>Q</k> <k>E</k> zero", "<k>Shift</k> breath <k>R</k> reload <k>O</k> doors", "<k>H</k> all controls · Xbox controller works too" };
             float ry = cy + 26 * U;
             foreach (string s in list) ry += Rich(s, colR, ry, 15 * U, colRW, 29 * U, A(Bone, 0.9f), Bone);

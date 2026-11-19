@@ -195,8 +195,8 @@ namespace PaxRomana
         }
         void UseDoor() { if (!KcActive && Capture.UseDoor()) Pad.Rumble(low: 0.35f, ms: 160, decay: true); }
 
-        // Controller. LT scope, RT fire, RB explosive, LB hold breath, X reload, A use / skip, B crouch, R3 prone,
-        // D-pad zoom and zero, L3 sprint, View controls, Menu pause.
+        // Controller. LT scope, RT fire, RB explosive, LB run (hold breath when scoped), X reload, A use / skip,
+        // B crouch, R3 prone, D-pad zoom and zero, L3 sprint, View controls, Menu pause.
         void PadInput()
         {
             if (!Pad.Connected) return;
@@ -407,7 +407,7 @@ namespace PaxRomana
 
             if (!paused)
             {
-                if (!KcActive && Started) { AimFriction(); Player.Update(dtReal); }
+                if (!KcActive && Started) { AimFriction(); Player.Aiming = Weapon.WantAds; Player.Update(dtReal); }
                 if (Player.Swimming) Weapon.WantAds = false;
                 if (!KcActive && Started) Capture.Update(dtReal);
                 if (Capture.Done && endT < 0 && !Over) { endT = 3; Win = true; }

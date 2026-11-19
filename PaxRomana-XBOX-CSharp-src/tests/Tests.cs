@@ -79,6 +79,17 @@ namespace PaxRomana
             axes[1] = -1; Tick(60); Release();
             float moved = Vector3.Distance(sim.Player.Pos, p0);
             Check(moved > 2.5f && moved < 4.6f, "one second of left stick forward walks " + moved.ToString("0.00") + " m");
+            Vector3 p1 = sim.Player.Pos;
+            axes[1] = -1; btn[Btn.LB] = 1; Tick(60); Release();
+            float ran = Vector3.Distance(sim.Player.Pos, p1);
+            Check(ran > moved * 1.35f && sim.Player.Stance == 0, "holding LB runs: " + ran.ToString("0.00") + " m in a second");
+            Press(Btn.B); p1 = sim.Player.Pos;
+            axes[1] = -1; btn[Btn.L3] = 1; Tick(); btn[Btn.L3] = 0; Tick(59); Release();
+            ran = Vector3.Distance(sim.Player.Pos, p1);
+            Check(ran > moved * 1.35f && sim.Player.Stance == 0, "clicking the left stick from a crouch stands up and runs: " + ran.ToString("0.00") + " m in a second");
+            axes[1] = -1; btn[Btn.LB] = 1; Tick(20); btn[Btn.LT] = 1; Tick(40);
+            Check(sim.Weapon.Scoped && !sim.Player.Sprinting && sim.Player.Holding, "pulling LT while running raises the scope, and LB then holds breath");
+            Release(); Tick(30); yaw0 = sim.Player.Yaw;
             axes[2] = 1; Tick(60); Release();
             float turned = M.Deg(yaw0 - sim.Player.Yaw);
             Check(turned > 100 && turned < 260, "one second of right stick turns " + turned.ToString("0") + " degrees to the right");

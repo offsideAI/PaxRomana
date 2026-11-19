@@ -8,7 +8,7 @@
 | Technology | C# 7.3, MonoGame 3.8.1.303, no web view, no JavaScript, no asset files |
 | Document date | 2026-11-18, revised the same day for the Level Zero re-theme (see below) |
 | Branch | `develop` |
-| Status | Implemented and committed (3575a97). Rules tested and rendering checked on a Mac. The Xbox package builds on GitHub Actions. **Nothing has been installed or run on the console yet** (see [section 9](#9-status-and-acceptance)). |
+| Status | Level Zero is implemented. Rules tested and rendering checked on a Mac. **The game starts on the Xbox Series S** (first confirmed by the owner on 2026-11-18, with the build that has .NET Native off and a per-build version); the acceptance list in section 9 has not been walked through on the console yet. |
 
 This document has two parts. Sections 1 to 9 are the product requirements: what the game is and how it must behave.
 Section 10 onwards is the developer documentation: how the code is organised and how to build, test, install and
@@ -37,7 +37,7 @@ rules correctly but may use the old names.
 
 Unchanged: the map layout and coordinates, the 29 posts and patrol routes, alert rules, ballistics, kill-cam,
 explosive charges, door mechanics, controls, haptics, sound, architecture, build and deployment. The rules test now
-has 67 checks, including the intro (skipped, and played through), the walk through the keep into the vault, and the
+has 70 checks, including the intro (skipped, and played through), the walk through the keep into the vault, and the
 voice-over clips.
 
 Later levels (infiltrating and subverting the enrichment zone) are not designed or built.
@@ -184,7 +184,9 @@ The world is laid out by a seeded generator, so it is identical on every run and
 
 - **Free roam** over the whole valley, with collision against walls, towers, closed doors, trees, boulders, tents and
   living soldiers. The playable area stops 14 m inside the edge of the valley, with a hint when the player reaches it.
-- **Sprint** (standing, moving forward, not scoped): 1.6 times walking speed. Sprinting lowers the rifle.
+- **Run** (moving forward, not scoped): 1.6 times walking speed, by holding LB or clicking the left stick (the
+  usual shooter layout). Running lowers the rifle, stands the player up from a crouch or from prone, and ends the
+  moment the scope is raised; with the scope up, LB holds breath instead.
 - **Scoped movement** is 35% of normal speed.
 - **Water**: wading slows the player by up to 58%. Where the river bed is deeper than 1.35 m the player swims, cannot
   crouch and cannot shoot ("You cannot shoot while swimming"). Sentries notice a swimmer at half the usual distance.
@@ -294,7 +296,8 @@ at 720 lines and scale with the screen height.
 
 | Action | Controller | Keyboard and mouse (desktop) |
 | --- | --- | --- |
-| Move / sprint | Left stick / click it | W A S D / Shift |
+| Move | Left stick | W A S D |
+| Run | Hold LB, or click the left stick and keep pushing forward | Shift |
 | Look and aim | Right stick | Mouse or arrow keys |
 | Scope | LT (hold) | Right button (hold) or F (toggle) |
 | Fire the rifle | RT | Left button, Space or Enter |
@@ -426,7 +429,7 @@ workflow that runs the test before it builds the package.
 
 | Check | Result |
 | --- | --- |
-| Headless rules test (`tests/`), 67 checks | Passes. Last run 2026-11-18 after the voice-over was added. |
+| Headless rules test (`tests/`), 70 checks | Passes. Last run 2026-11-18 after running with LB was added. |
 | Shared code compiles against .NET Standard 2.0 and C# 7.3 (`tools/apicheck`) | Passes |
 | Shared code compiles against the real `MonoGame.Framework.WindowsUniversal` 3.8.1.303 assembly | Passed, in a scratch project on the Mac |
 | GitHub Actions workflow: rules test on Windows, UWP project and `Program.cs` compile with .NET Native, package signed and uploaded | Passed on the first run, 2026-11-18 (run 44402866842, commit 3575a97). That was the build before the Level Zero re-theme; the re-themed code has not been through the workflow yet. |
