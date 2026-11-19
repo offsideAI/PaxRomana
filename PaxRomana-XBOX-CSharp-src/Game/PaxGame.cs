@@ -14,6 +14,9 @@ namespace PaxRomana
     {
         protected readonly GraphicsDeviceManager Graphics;
         protected World World; protected GameSim Sim;
+        protected readonly World[] Worlds = new World[2];      // Level Zero and Level One, both built at start-up
+        public int StartLevel;                                  // the level shown first
+        bool levelZeroWon; readonly bool[] introShown = new bool[2];
         protected Renderer Renderer; HudRenderer hudRenderer;
         // Start-up diary. The Xbox app points this at a file the Device Portal can read, so a launch that fails before
         // anything can be drawn still leaves a record of how far it got. A no-op everywhere else.
@@ -25,13 +28,12 @@ namespace PaxRomana
         readonly Hud bootHud = new Hud();
         IAudio audio = new NullAudio(); SynthAudio synth;
         Task<Loaded> loader; volatile float loadP; volatile string loadText = "Preparing…";
-        sealed class Loaded { public World World; public Dictionary<string, short[]> Pcm; public byte[][] Voice; }
+        sealed class Loaded { public World World, LevelOne; public Dictionary<string, short[]> Pcm; public byte[][] Voice; }
         int padIndex = -1; readonly float[] axes = new float[4], buttons = new float[16], sent = new float[4];
         KeyboardState prevKeys; MouseState prevMouse; bool captured;
         protected RenderTarget2D Output;        // where the finished frame goes; null = the screen
         RenderTarget2D scene; SpriteBatch blit; bool noMsaa;
         string fatal;                           // set if the game hit an error it could not recover from
-        bool introShown;
 
         public PaxGame()
         {
@@ -71,7 +73,8 @@ namespace PaxRomana
                 Loaded l = new Loaded();
                 Log("loader: building the world");
                 l.World = World.Build((p, text) => { loadP = p; loadText = text; });
-                Log("loader: world built");
+                l.LevelOne = World.BuildLevelOne(l.World);
+                Log("loader: both levels built");
                 if (wantSound)
                 {
                     l.Pcm = Synth.RenderAll(); l.Voice = ReadVoice();
@@ -99,12 +102,20 @@ namespace PaxRomana
             return files;
         }
 
-        void NewMission()
+        // Starts a mission on the given level, uploading that level to the graphics device if it is not the one there now.
+        protected void NewMission(int level)
         {
+            if (World != Worlds[level])
+            {
+                World = Worlds[level];
+                Renderer.SetWorld(World);
+                Log("level " + level + " uploaded to the graphics device");
+            }
             Hud hud = new Hud();
             hud.SetReady();
-            Sim = new GameSim(World, audio, pad, km, hud) { Console = IsConsole, ShowIntro = !introShown };
-            introShown = true;          // the intro plays once per session, not on every new mission
+            // the intro plays once per level and session, not on every new mission
+            Sim = new GameSim(World, audio, pad, km, hud) { Console = IsConsole, ShowIntro = !introShown[level] };
+            introShown[level] = true;
             pad.Stop();
         }
 
@@ -247,15 +258,13 @@ namespace PaxRomana
                     else
                     {
                         Loaded l = loader.Result; loader = null;
-                        World = l.World;
-                        Renderer.SetWorld(World);
-                        Log("world uploaded to the graphics device");
+                        Worlds[0] = l.World; Worlds[1] = l.LevelOne;
                         if (l.Pcm != null)
                         {
                             try { synth = new SynthAudio(l.Pcm); if (l.Voice != null) synth.SetVoice(l.Voice); audio = synth; Log("audio ready"); }
                             catch (Exception e) { audio = new NullAudio(); Log("no audio, playing silently: " + e); }
                         }
-                        NewMission();
+                        NewMission(Math.Max(0, Math.Min(1, StartLevel)));
                     }
                 }
                 if (!IsConsole && km.Pressed(K.Escape)) Exit();
@@ -263,10 +272,14 @@ namespace PaxRomana
             else
             {
                 bool onMenu = !Sim.Player.Enabled && !Sim.Intro;
+                // The other level can be chosen from the menu while DEBUG_MODE is on; otherwise Level One has to be earned.
+                Sim.CanSwitchLevels = Config.DEBUG_MODE || levelZeroWon;
                 Sim.Frame(dt);
+                if (Sim.Over && Sim.Win && World.Level == 0) levelZeroWon = true;
                 if (synth != null) synth.Update(dt);
                 SendRumble(false);
-                if (Sim.RestartRequested) NewMission();
+                if (Sim.LevelRequest >= 0) NewMission(Sim.LevelRequest);
+                else if (Sim.RestartRequested) NewMission(World.Level);
                 else if (onMenu && !IsConsole && km.Pressed(K.Escape)) Exit();
             }
         }

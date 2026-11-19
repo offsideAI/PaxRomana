@@ -10,10 +10,13 @@ namespace PaxRomana
 {
     public sealed class World
     {
-        public Textures Tex; public List<IndexedMesh> Terrain; public Castle Castle; public Works Works; public Vegetation Veg;
+        public int Level;
+        public Textures Tex; public List<IndexedMesh> Terrain; public Site Site; public Castle Castle; public Facility Facility; public Works Works; public Vegetation Veg;
         public Colliders Colliders; public Geo[][] SoldierParts; public Geo Rifle, Bolt;
         public readonly List<Solid> Solids = new List<Solid>();
+        public Arena Arena; public Vector3 Wind; public LightRig Outdoor, Indoor; public IntroScript Intro;
 
+        // Level Zero: the valley, the castle and the enrichment works on the horizon.
         public static World Build(Action<float, string> progress, bool textures = true, int grassCount = 40000)
         {
             World w = new World();
@@ -22,16 +25,41 @@ namespace PaxRomana
             progress(0.3f, "Growing summer grass along the river…");
             w.Terrain = PaxRomana.Terrain.Build();
             progress(0.5f, "Raising Burg Adlerstein and the enrichment works…");
-            w.Castle = Castle.Build();
+            w.Castle = Castle.Build(); w.Site = w.Castle;
             w.Works = Works.Build();
-            w.Colliders = new Colliders(w.Castle);
+            w.Colliders = new Colliders(w.Castle, Castle.ColliderKeys);
             progress(0.65f, "Leafing the birch and pine…");
             w.Veg = Vegetation.Build(grassCount);
             progress(0.85f, "Posting the garrison…");
             w.SoldierParts = Soldier.BuildParts();
             w.Rifle = Weapon.BuildRifle(); w.Bolt = Weapon.BuildBolt();
             w.Solids.AddRange(w.Castle.Solids); w.Solids.AddRange(w.Veg.Obstacles);
+            const float EDGE = 14;
+            w.Arena = new Arena
+            {
+                Ground = PaxRomana.Terrain.GroundAt, Water = true, Bridge = true,
+                X0 = Config.INNER_X0 + EDGE, X1 = Config.INNER_X0 + Config.INNER_SIZE - EDGE, Z0 = Config.INNER_Z0 + EDGE, Z1 = Config.INNER_Z0 + Config.INNER_SIZE - EDGE,
+                Spawn = new Vector3(Config.SPAWN_X, 0, Config.SPAWN_Z), SpawnYaw = M.Atan2(Config.SPAWN_X, Config.SPAWN_Z), EdgeHint = "Edge of the valley. The castle lies behind you",
+            };
+            w.Wind = Config.WIND; w.Outdoor = LightRig.Outdoor(); w.Indoor = w.Outdoor; w.Intro = IntroScript.LevelZero;
             progress(0.95f, "Polishing the lens…");
+            return w;
+        }
+
+        // Level One: the facility under BlitzScheiss Mountain. It shares the textures and the soldier and rifle
+        // models with Level Zero.
+        public static World BuildLevelOne(World shared)
+        {
+            World w = new World { Level = 1, Tex = shared.Tex, SoldierParts = shared.SoldierParts, Rifle = shared.Rifle, Bolt = shared.Bolt };
+            w.Facility = Facility.Build(); w.Site = w.Facility;
+            w.Terrain = new List<IndexedMesh> { w.Facility.Mountain };
+            w.Colliders = new Colliders(w.Facility, Facility.Keys);
+            w.Solids.AddRange(w.Facility.Solids);
+            w.Arena = Facility.MakeArena();
+            w.Wind = Vector3.Zero; w.Indoor = Facility.Indoor(); w.Intro = IntroScript.LevelOne;
+            // the tunnel comes out on the east face of the mountain: a morning sun, so that face is in the light
+            w.Outdoor = LightRig.Outdoor();
+            w.Outdoor.SunDir = Vector3.Normalize(new Vector3(0.62f, 0.6f, 0.3f)); w.Outdoor.BounceFrom = Vector3.Normalize(new Vector3(-0.6f, -0.4f, -0.3f));
             return w;
         }
     }
@@ -39,9 +67,12 @@ namespace PaxRomana
     public sealed class GameSim
     {
         public readonly World World; public readonly Garrison Garrison; public readonly Fx Fx; public readonly IAudio Audio; public readonly Player Player;
-        public readonly Capture Capture; public readonly Weapon Weapon; public readonly Colliders Colliders; public readonly Hud Hud; public readonly Pad Pad; public readonly KeyMouse Km;
+        public readonly Mission Mission; public readonly Weapon Weapon; public readonly Colliders Colliders; public readonly Hud Hud; public readonly Pad Pad; public readonly KeyMouse Km;
         public bool Console;                 // running on the console: controller prompts from the start
         public bool Started, Over, Win, RestartRequested;
+        public Capture Capture { get { return Mission as Capture; } }        // the Level Zero mission, or null
+        public int LevelRequest = -1;        // set when the player asks for another level (from the menu, or after winning Level Zero)
+        public bool CanSwitchLevels;         // the menu offers the other level
         public bool AlwaysKillCam;           // every predicted hit gets the kill-cam (used by the visual check)
         public bool ShowIntro = true;        // play the Level Zero intro before the first mission of a session
         public bool Intro;                   // the intro is playing
@@ -67,14 +98,30 @@ namespace PaxRomana
         public GameSim(World world, IAudio audio, Pad pad, KeyMouse km, Hud hud)
         {
             World = world; Audio = audio; Pad = pad; Km = km; Hud = hud;
-            world.Castle.Reset();
+            world.Site.Reset();
             Colliders = world.Colliders;
-            Garrison = new Garrison(world.Castle);
-            Fx = new Fx();
-            for (int i = 0; i < world.Castle.Smoke.Count; i++) Fx.AddSmoke(world.Castle.Smoke[i], i < 2 ? 1 : 1.5f);
-            Player = new Player(world.Solids, audio, Garrison.Soldiers, pad, km);
-            Capture = new Capture(world.Castle, Player, Garrison, hud, audio, pad);
+            if (world.Level == 0) Garrison = new Garrison(world.Castle);
+            else { Garrison = new Garrison(); world.Facility.Post(Garrison); }
+            Fx = new Fx(world.Level == 0);
+            for (int i = 0; i < world.Site.Smoke.Count; i++) Fx.AddSmoke(world.Site.Smoke[i], i < 2 ? 1 : 1.5f);
+            Player = new Player(world.Arena, world.Solids, audio, Garrison.Soldiers, pad, km);
+            if (world.Level == 0) Mission = new Capture(world.Castle, Player, Garrison, hud, audio, pad);
+            else
+            {
+                Sabotage sab = new Sabotage(world.Facility, Player, Garrison, hud, audio, pad);
+                // the device goes off: fire and smoke out of the tunnel mouth, and the mountain shakes
+                sab.Detonated = () =>
+                {
+                    Vector3 mouth = new Vector3(Facility.MouthX - 1, Facility.FY + 14.5f, Facility.TunnelZ);
+                    Fx.Explosion(mouth); Audio.Explosion(0.3f, 60);
+                    Fx.AddSmoke(mouth, 3); Fx.AddSmoke(mouth + new Vector3(2, 1.5f, 0), 2.4f);
+                    Pad.Rumble(low: 1, high: 0.8f, lt: 0.5f, rt: 0.5f, ms: 1600, decay: true); Pad.Rumble(low: 0.6f, ms: 1300, delay: 900, decay: true);
+                    Player.Shake = 1.6f;
+                };
+                Mission = sab;
+            }
             Weapon = new Weapon(this, Player);
+            Hud.Level = world.Level; Hud.Intro = world.Intro;
             Hud.Total = Garrison.Total;
 
             Garrison.OnAlarm = () =>
@@ -93,7 +140,8 @@ namespace PaxRomana
             };
             Weapon.OnDry = () => Pad.Rumble(rt: 0.3f, ms: 35);
             Player.OnHeartbeat = () => { Pad.Rumble(low: 0.22f, ms: 70); Pad.Rumble(low: 0.15f, ms: 70, delay: 170); };
-            Player.OnEdge = () => { if (edgeT <= 0) { edgeT = 6; Hud.Hint("Edge of the valley. The castle lies behind you", 3000); } };
+            Player.OnEdge = () => { if (edgeT <= 0) { edgeT = 6; Hud.Hint(World.Arena.EdgeHint, 3000); } };
+            Mission.Update(0);          // puts every prop in its place before the first frame is drawn
             SetTitleCamera();
         }
 
@@ -123,7 +171,7 @@ namespace PaxRomana
                 kills++; Weapon.Hits++; Weapon.Longest = Math.Max(Weapon.Longest, dist);
             }
             Garrison.AlertAround(at, 70, 25, 40);
-            Capture.Blast(at);
+            Mission.Blast(at);
             if (kills > 0) { Hud.Hitmarker(false); Hud.Feed("Blast <em>" + (int)Math.Round(dist) + " m</em> <b>" + kills + " DOWN</b>", "head"); }
         }
 
@@ -142,7 +190,8 @@ namespace PaxRomana
             for (float d = 4; d < 1800; d += 4)
             {
                 Vector3 v = o + dir * d;
-                if (v.Y < Math.Max(0, Terrain.GroundAt(v.X, v.Z))) { best = d - 2; break; }
+                float gy = World.Arena.Ground(v.X, v.Z);
+                if (v.Y < (World.Arena.Water ? Math.Max(0, gy) : gy)) { best = d - 2; break; }
             }
             float hd; Vector3 hn; bool wood;
             if (Colliders.Raycast(o, dir, best > 0 ? best : 1800, out hd, out hn, out wood)) best = hd;
@@ -193,7 +242,7 @@ namespace PaxRomana
             if (Weapon.Charges == 0 && Weapon.Cool <= 0) Hud.Hint("No explosive charges left", 1600);
             Weapon.FireExplosive();
         }
-        void UseDoor() { if (!KcActive && Capture.UseDoor()) Pad.Rumble(low: 0.35f, ms: 160, decay: true); }
+        void UseDoor() { if (!KcActive && Mission.Use()) Pad.Rumble(low: 0.35f, ms: 160, decay: true); }
 
         // Controller. LT scope, RT fire, RB explosive, LB run (hold breath when scoped), X reload, A use / skip,
         // B crouch, R3 prone, D-pad zoom and zero, L3 sprint, View controls, Menu pause.
@@ -203,9 +252,14 @@ namespace PaxRomana
             bool a = Pad.Pressed(Btn.A), menu = Pad.Pressed(Btn.MENU);
             bool rt = Pad.Value(Btn.RT) > 0.5f, rtEdge = rt && !rtHeld;
             rtHeld = rt;
-            if (Over) { if (a || menu) RestartRequested = true; return; }
+            if (Over) { if (a || menu) Continue(); return; }
             if (Intro) { if ((a || menu || rtEdge) && IntroT > 0.5f) EndIntro(); return; }
-            if (!Player.Enabled) { if ((a || menu) && Hud.Ready) Begin(true); return; }      // title or pause screen
+            if (!Player.Enabled)             // title or pause screen
+            {
+                if (CanSwitchLevels && (Pad.Pressed(Btn.LEFT) || Pad.Pressed(Btn.RIGHT))) { LevelRequest = 1 - World.Level; return; }
+                if ((a || menu) && Hud.Ready) Begin(true);
+                return;
+            }
             if (menu) { SetPlaying(false); return; }
             if (Pad.Pressed(Btn.VIEW)) Hud.ToggleKeys();
             if (KcActive) { if (a || rtEdge) Trigger(); return; }
@@ -229,9 +283,14 @@ namespace PaxRomana
         {
             if (Km.AnyInput) Pad.Active = false;
             bool go = Km.Pressed(K.Enter) || Km.Pressed(K.Space) || Km.LeftHit;
-            if (Over) { if (go) RestartRequested = true; return; }
+            if (Over) { if (go) Continue(); return; }
             if (Intro) { if ((go || Km.Pressed(K.Escape)) && IntroT > 0.5f) EndIntro(); return; }
-            if (!Player.Enabled) { if (go && Hud.Ready) Begin(false); return; }
+            if (!Player.Enabled)
+            {
+                if (CanSwitchLevels && (Km.Pressed(K.Left) || Km.Pressed(K.Right))) { LevelRequest = 1 - World.Level; return; }
+                if (go && Hud.Ready) Begin(false);
+                return;
+            }
             if (Km.Pressed(K.Escape)) { SetPlaying(false); return; }
             if (Km.Pressed(K.C)) Player.ToggleStance(1);
             if (Km.Pressed(K.Z)) Player.ToggleStance(2);
@@ -294,6 +353,9 @@ namespace PaxRomana
             spotted = seen;
         }
 
+        // From the end screen: on to Level One after winning Level Zero, otherwise the same level again.
+        void Continue() { if (Win && World.Level == 0) LevelRequest = 1; else RestartRequested = true; }
+
         // Playing or paused.
         public void SetPlaying(bool on)
         {
@@ -325,36 +387,25 @@ namespace PaxRomana
             Begin(padMode);
         }
 
-        // Camera shots of the intro, one per card: where the camera starts and what it looks at, then where it ends
-        // and what it looks at. Each shot lasts as long as its card (IntroScript.Cuts).
-        static readonly float[][] IntroShots =
-        {
-            //      from x, y, z          looks at            to x, y, z            looks at
-            new[] { 150f, 96, 470,        0, 44, 0,           110, 78, 300,         0, 46, 0 },                                             // from behind the ridge, the castle across the valley
-            new[] { -60f, 120, 110,       Config.WORKS_X, 30, Config.WORKS_Z,       120, 105, -160,   Config.WORKS_X, 34, Config.WORKS_Z },   // over the castle towards the works
-            new[] { 72f, 74, 84,          0, 50, -8,          -68, 70, 78,          0, 48, -8 },                                            // round the keep
-            new[] { Config.SPAWN_X - 6, 100, Config.SPAWN_Z + 40,   0, 40, 0,       Config.SPAWN_X, 79, Config.SPAWN_Z + 2,   0, 40, 0 },    // down to the nest, between its trees
-        };
-
         void SetIntroCamera()
         {
-            float[] cuts = IntroScript.Cuts;
+            float[] cuts = World.Intro.Cuts; float[][] shots = World.Intro.Shots;
             int i = 0;
-            while (i < IntroShots.Length - 1 && IntroT >= cuts[i + 1]) i++;
-            float[] s = IntroShots[i];
+            while (i < shots.Length - 1 && IntroT >= cuts[i + 1]) i++;
+            float[] s = shots[i];
             float k = M.Smoothstep(0, 1, (IntroT - cuts[i]) / (cuts[i + 1] - cuts[i]));
             Vector3 pos = Vector3.Lerp(new Vector3(s[0], s[1], s[2]), new Vector3(s[6], s[7], s[8]), k);
             Vector3 look = Vector3.Lerp(new Vector3(s[3], s[4], s[5]), new Vector3(s[9], s[10], s[11]), k);
-            pos.Y = Math.Max(pos.Y, Terrain.GroundAt(pos.X, pos.Z) + 3);
+            pos.Y = Math.Max(pos.Y, World.Arena.Ground(pos.X, pos.Z) + 1.2f);
             Player.Cam.LookAt(pos, look);
             Player.Cam.Fov = 52; Player.Cam.Near = 0.5f;
         }
 
         void SetTitleCamera()
         {
-            float a = titleT * 0.03f;
-            Vector3 pos = new Vector3(Config.SPAWN_X + M.Sin(a) * 40, Terrain.GroundAt(Config.SPAWN_X, Config.SPAWN_Z) + 9, Config.SPAWN_Z + 14);
-            Player.Cam.LookAt(pos, new Vector3(0, 44, 0));
+            Vector3 pos, look;
+            Mission.TitleCamera(titleT, out pos, out look);
+            Player.Cam.LookAt(pos, look);
             Player.Cam.Fov = Player.BASE_FOV; Player.Cam.Near = 0.25f;
         }
 
@@ -363,7 +414,7 @@ namespace PaxRomana
         {
             PadInput(); Pad.Update(dtReal);
             KeyInput();
-            Hud.IsPad = Pad.Active || Console;
+            Hud.IsPad = Pad.Active || Console; Hud.LevelSelect = CanSwitchLevels;
             bool paused = Paused;
 
             // kill-cam time dilation
@@ -409,9 +460,9 @@ namespace PaxRomana
             {
                 if (!KcActive && Started) { AimFriction(); Player.Aiming = Weapon.WantAds; Player.Update(dtReal); }
                 if (Player.Swimming) Weapon.WantAds = false;
-                if (!KcActive && Started) Capture.Update(dtReal);
-                if (Capture.Done && endT < 0 && !Over) { endT = 3; Win = true; }
-                World.Veg.Grass.Update(Player.Pos.X, Player.Pos.Z);
+                if (!KcActive && Started) Mission.Update(dtReal);
+                if (Mission.Done && endT < 0 && !Over) { endT = Mission.EndDelay; Win = true; }
+                if (World.Veg != null) World.Veg.Grass.Update(Player.Pos.X, Player.Pos.Z);
                 edgeT -= dtReal; spotT -= dt;
                 if (spotT <= 0 && Started && !Over && !KcActive) { spotT = 0.5f; Watch(); }
                 Weapon.Update(dtReal, dt, !KcActive && Started);
@@ -438,15 +489,16 @@ namespace PaxRomana
                 Hud.ScopeOn = scoped;
                 if (scoped)
                 {
-                    float cross = Vector3.Dot(Config.WIND, Player.Cam.Right);
-                    Hud.Wind = (cross > 0.15f ? "> " : cross < -0.15f ? "< " : "· ") + (Config.WIND.Length() * 5).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " m/s";
+                    float cross = Vector3.Dot(World.Wind, Player.Cam.Right);
+                    Hud.Wind = (cross > 0.15f ? "> " : cross < -0.15f ? "< " : "· ") + (World.Wind.Length() * 5).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " m/s";
                     Hud.Range = range; Hud.Zero = Weapon.Zero; Hud.Zoom = Weapon.Zoom; Hud.Breath = Player.Breath; Hud.Exhausted = Player.Exhausted > 0;
                 }
                 if (hintDelay > 0)
                 {
                     hintDelay -= dtReal;
                     if (hintDelay <= 0)
-                        Hud.Hint(Hud.IsPad ? "LT scope · RT fire · RB explosive · View shows all controls" : "Right mouse scope · Left mouse fire · G explosive · H shows all controls", 9000);
+                        Hud.Hint(World.Level == 1 ? (Hud.IsPad ? "A picks up, puts down and turns things · View shows all controls" : "O picks up, puts down and turns things · H shows all controls")
+                            : Hud.IsPad ? "LT scope · RT fire · RB explosive · View shows all controls" : "Right mouse scope · Left mouse fire · G explosive · H shows all controls", 9000);
                 }
                 if (endT > 0 && !KcActive)
                 {
@@ -467,13 +519,13 @@ namespace PaxRomana
                 if (Intro)
                 {
                     IntroT += dtReal; Hud.IntroT = IntroT;
-                    if (IntroT >= IntroScript.Length) EndIntro();
+                    if (IntroT >= World.Intro.Length) EndIntro();
                     else
                     {
                         SetIntroCamera();
                         // the narration for a card starts a moment after the card appears
-                        int card = IntroScript.IndexAt(IntroT - IntroScript.VoiceDelay);
-                        if (card >= 0 && card != introVoiced) { introVoiced = card; Audio.Voice(card); }
+                        int card = World.Intro.IndexAt(IntroT - PaxRomana.IntroScript.VoiceDelay);
+                        if (card >= 0 && card != introVoiced) { introVoiced = card; if (World.Intro.Voiced) Audio.Voice(card); }
                     }
                 }
                 else

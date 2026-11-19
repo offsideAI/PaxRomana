@@ -1,6 +1,7 @@
 // Heads-up display state. The rules write to it; HudRenderer draws it. Text may carry <b>…</b> and <em>…</em> runs.
 using System;
 using System.Collections.Generic;
+using Microsoft.Xna.Framework;
 
 namespace PaxRomana
 {
@@ -26,7 +27,8 @@ namespace PaxRomana
         public bool MenuVisible = true, Resume, Ready, Failed; public float LoadP; public string LoadText = "Preparing…";
         public bool EndVisible, Win; public EndStats Stats;
         public float CineK;         // eased 0..1, for the letterbox bars
-        public bool IntroOn; public float IntroT;      // the Level Zero intro: which card to show comes from IntroScript.Cards
+        public bool IntroOn; public float IntroT; public IntroScript Intro;      // the intro: which card to show comes from Intro.Cards
+        public int Level; public bool LevelSelect;      // which level this is, and whether the menu offers the other one
 
         public void Loading(float p, string text) { LoadP = p; LoadText = text; }
         public void SetReady() { Ready = true; LoadP = 1; }
@@ -57,58 +59,91 @@ namespace PaxRomana
         }
     }
 
-    // The intro that plays once before the first mission: it names the level and gives the briefing over a flight
-    // across the valley, narrated by the voice-over in assets/voice. A card stays up for as long as its narration
-    // runs, so the timings come from the clip lengths in IntroVoice. A line may carry <b> and <em> runs.
+    // A level's intro: it names the level and gives the briefing over a few camera moves. Level Zero's is narrated
+    // by the voice-over in assets/voice, and each of its cards stays up for as long as its narration runs (the clip
+    // lengths are in IntroVoice). Level One's cards run for fixed times. A line may carry <b> and <em> runs.
     public sealed class IntroCard
     {
         public float Start, End; public string Kicker, Title, Sub; public string[] Lines;
     }
 
-    public static class IntroScript
+    public sealed class IntroScript
     {
         const float LEAD = 0.8f, GAP = 0.6f, TAIL = 0.9f;
         public const float VoiceDelay = 0.3f;         // the narration starts this long after its card appears
-        public static readonly IntroCard[] Cards =
+        public readonly IntroCard[] Cards;
+        public readonly float Length;                 // seconds
+        public readonly float[] Cuts;                 // the camera shot behind card i runs from Cuts[i] to Cuts[i + 1]
+        // One shot per card: where the camera starts and what it looks at, then where it ends and what it looks at.
+        public readonly float[][] Shots;
+        public readonly bool Voiced;
+
+        IntroScript(IntroCard[] cards, float[] seconds, float[][] shots, bool voiced)
+        {
+            Cards = cards; Shots = shots; Voiced = voiced;
+            Cuts = new float[cards.Length + 1];
+            float t = LEAD;
+            for (int i = 0; i < cards.Length; i++)
+            {
+                float speech = i < seconds.Length ? seconds[i] : 4;
+                cards[i].Start = t; cards[i].End = t + VoiceDelay + speech + TAIL;
+                Cuts[i] = i == 0 ? 0 : t - GAP / 2;
+                t = cards[i].End + GAP;
+            }
+            Length = t; Cuts[cards.Length] = t;
+        }
+
+        public int IndexAt(float t) { for (int i = 0; i < Cards.Length; i++) if (t >= Cards[i].Start && t < Cards[i].End) return i; return -1; }
+        public IntroCard At(float t) { int i = IndexAt(t); return i < 0 ? null : Cards[i]; }
+
+        public static readonly IntroScript LevelZero = new IntroScript(new[]
         {
             new IntroCard { Kicker = "RESEARCH AND ANALYSIS WING · FIELD DOSSIER", Title = "LEVEL ZERO", Sub = "THE KEYS" },
             new IntroCard { Kicker = "BAVARIA · SUMMER 1944", Lines = new[] { "Beyond this valley the Reich is enriching <b>uranium-235</b>.", "The works are walled, wired and watched. No one walks in." } },
             new IntroCard { Kicker = "BURG ADLERSTEIN", Lines = new[] { "The <b>keys to the enrichment zone</b> lie in a strongbox", "in the vault of the castle keep, behind a garrison of twenty-nine." } },
             new IntroCard { Kicker = "YOUR ORDERS, AGENT", Lines = new[] { "Clear the castle and <b>take the keys</b>.", "<em>Level One: enter the zone, and break it from the inside.</em>" } },
-        };
-        public static readonly float Length;          // seconds
-        public static readonly float[] Cuts;          // the camera shot behind card i runs from Cuts[i] to Cuts[i + 1]
-
-        static IntroScript()
+        }, IntroVoice.Seconds, new[]
         {
-            Cuts = new float[Cards.Length + 1];
-            float t = LEAD;
-            for (int i = 0; i < Cards.Length; i++)
-            {
-                float speech = i < IntroVoice.Seconds.Length ? IntroVoice.Seconds[i] : 4;
-                Cards[i].Start = t; Cards[i].End = t + VoiceDelay + speech + TAIL;
-                Cuts[i] = i == 0 ? 0 : t - GAP / 2;
-                t = Cards[i].End + GAP;
-            }
-            Length = t; Cuts[Cards.Length] = t;
-        }
+            //      from x, y, z          looks at            to x, y, z            looks at
+            new[] { 150f, 96, 470,        0, 44, 0,           110, 78, 300,         0, 46, 0 },                                             // from behind the ridge, the castle across the valley
+            new[] { -60f, 120, 110,       Config.WORKS_X, 30, Config.WORKS_Z,       120, 105, -160,   Config.WORKS_X, 34, Config.WORKS_Z },   // over the castle towards the works
+            new[] { 72f, 74, 84,          0, 50, -8,          -68, 70, 78,          0, 48, -8 },                                            // round the keep
+            new[] { Config.SPAWN_X - 6, 100, Config.SPAWN_Z + 40,   0, 40, 0,       Config.SPAWN_X, 79, Config.SPAWN_Z + 2,   0, 40, 0 },    // down to the nest, between its trees
+        }, true);
 
-        public static int IndexAt(float t) { for (int i = 0; i < Cards.Length; i++) if (t >= Cards[i].Start && t < Cards[i].End) return i; return -1; }
-        public static IntroCard At(float t) { int i = IndexAt(t); return i < 0 ? null : Cards[i]; }
+        const float FY = Facility.FY;
+        public static readonly IntroScript LevelOne = new IntroScript(new[]
+        {
+            new IntroCard { Kicker = "RESEARCH AND ANALYSIS WING · FIELD DOSSIER", Title = "LEVEL ONE", Sub = "BLITZSCHEISS MOUNTAIN" },
+            new IntroCard { Kicker = "UNDER THE MOUNTAIN", Lines = new[] { "The keys open the service lock. <b>Four interlocks</b> stand", "between you and the centrifuge hall." } },
+            new IntroCard { Kicker = "YOUR ORDERS, AGENT", Lines = new[] { "Plant the device at the cascade controls and get out.", "<b>Detonate from outside the mountain.</b>" } },
+        }, new[] { 3.6f, 5.6f, 5.6f }, new[]
+        {
+            new[] { 0f, FY + 11, -116,      0, FY + 3, -168,    0, FY + 8.5f, -136,    0, FY + 3, -168 },                         // down the centrifuge hall
+            new[] { 7f, FY + 4.6f, -25.5f,  0, FY + 1.3f, -38,  -6.5f, FY + 4.6f, -26, 0, FY + 1.3f, -38 },                      // the beam room
+            new[] { 4.5f, FY + 3.4f, 11,    0, FY + 1.5f, -1,   0, FY + 1.75f, 8.6f,   0, FY + 1.55f, -1 },                       // the service lock, down to where you stand
+        }, false);
     }
 
     // Taking the keys: doors (opened by hand or blown in), the count of defenders still inside the walls, and the
     // strongbox in the vault of the keep, which can only be cracked once those defenders are gone.
-    public sealed class Capture
+    public sealed class Capture : Mission
     {
         const float HOLD = 8;         // seconds at the strongbox to crack it
-        readonly Castle castle; readonly Player player; readonly Garrison garrison; readonly Hud hud; readonly IAudio audio; readonly Pad pad;
-        public float Progress; public bool Done; public int Stage = -1, Defenders = -1; public Door NearDoor;
-        float tickT; bool told; string text;
+        readonly Castle castle;
+        public int Defenders = -1;
+        float tickT; bool told;
 
-        public Capture(Castle castle, Player player, Garrison garrison, Hud hud, IAudio audio, Pad pad)
+        public Capture(Castle castle, Player player, Garrison garrison, Hud hud, IAudio audio, Pad pad) : base(castle, player, garrison, hud, audio, pad)
         {
-            this.castle = castle; this.player = player; this.garrison = garrison; this.hud = hud; this.audio = audio; this.pad = pad;
+            this.castle = castle;
+        }
+
+        public override void TitleCamera(float t, out Vector3 pos, out Vector3 look)
+        {
+            float a = t * 0.03f;
+            pos = new Vector3(Config.SPAWN_X + M.Sin(a) * 40, Terrain.GroundAt(Config.SPAWN_X, Config.SPAWN_Z) + 9, Config.SPAWN_Z + 14);
+            look = new Vector3(0, 44, 0);
         }
 
         public static bool InWalls(float x, float z) { return Math.Abs(x) < 48.5f && Math.Abs(z) < 41.5f; }
@@ -125,47 +160,11 @@ namespace PaxRomana
         // inside the curtain walls or the gate passage
         public bool Inside() { var p = player.Pos; return Math.Abs(p.X) < 43.5f && p.Z > -33.5f && p.Z < (Math.Abs(p.X) < 2.4f ? 39.4f : 33.4f); }
 
-        // open or close the nearest door
-        public bool UseDoor()
-        {
-            Door d = NearDoor;
-            if (d == null || d.Broken) return false;
-            d.Want = d.Want > 0 ? 0 : 1;
-            audio.Door();
-            return true;
-        }
-
-        // An explosion at p: doors within reach are blown off their hinges for good.
-        public int Blast(Microsoft.Xna.Framework.Vector3 p)
-        {
-            int n = 0;
-            foreach (Door d in castle.Doors)
-            {
-                if (d.Broken || M.Hypot(p.X - d.X, p.Z - d.Z) > 5.5f || Math.Abs(p.Y - Config.PLATEAU) > 9) continue;
-                d.Broken = true; d.Amt = d.Want = 1; d.Solid.Off = true;
-                hud.Feed("<b>BREACH</b> " + d.Name + " is down", "head");
-                n++;
-            }
-            return n;
-        }
-
-        public void Update(float dt)
+        public override void Update(float dt)
         {
             var p = player.Pos;
-            string key = pad.Active ? "A" : "O";
-            Door nd = null; float bd = 1e9f;
-            foreach (Door d in castle.Doors)
-            {
-                if (d.Broken) continue;
-                float step = dt / 0.65f;
-                d.Amt += M.Clamp(d.Want - d.Amt, -step, step);
-                d.Solid.Off = d.Amt > 0.5f;
-                float e = d.Amt * d.Amt * (3 - 2 * d.Amt);
-                foreach (DoorLeaf l in d.Leaves) l.Angle = l.Closed + (l.Open - l.Closed) * e;
-                float dist = M.Hypot(p.X - d.X, p.Z - d.Z);
-                if (dist < d.Reach && dist < bd) { bd = dist; nd = d; }
-            }
-            NearDoor = nd;
+            UpdateDoors(dt);
+            Door nd = NearDoor;
 
             // defenders still alive inside the walls
             int left = 0; List<string> spots = new List<string>();
@@ -201,7 +200,7 @@ namespace PaxRomana
             }
             hud.Capture(Progress, atBox && left > 0 && !Done ? "Contested: " + left + " defender" + (left == 1 ? "" : "s") + " inside the walls" : "");
 
-            if (nd != null) hud.Prompt(key, (nd.Want > 0 ? "Close " : "Open ") + nd.Name); else hud.Prompt("", "");
+            if (nd != null) hud.Prompt(Key, (nd.Want > 0 ? "Close " : "Open ") + nd.Name); else hud.Prompt("", "");
 
             int stage = Done ? 4 : left > 0 ? (Inside() ? 1 : 0) : atBox ? 3 : 2;
             string t;
@@ -213,7 +212,7 @@ namespace PaxRomana
                 case 3: t = "Stay at the strongbox"; break;
                 default: t = "You have the keys to the enrichment zone"; break;
             }
-            if (t != text) { text = t; hud.ObjLine = t; }
+            Objective(t);
             Stage = stage;
         }
     }

@@ -1,8 +1,9 @@
 # Pax Romana Xbox (C#, MonoGame): developer guide
 
 How to run, test, build and install the native C# edition of Pax Romana, which lives in
-`PaxRomana-XBOX-CSharp-src/`. What is there today is **Level Zero: The Keys** (Bavaria, summer 1944: take the keys
-to the U-235 enrichment zone from a castle vault). Development happens on the `develop` branch. This is the task-by-task guide. For the reference material, see:
+`PaxRomana-XBOX-CSharp-src/`. There are two levels: **Level Zero: The Keys** (Bavaria, summer 1944: take the keys to the U-235 enrichment zone from
+a castle vault) and **Level One: BlitzScheiss Mountain** (four puzzle rooms, then sabotage the centrifuge hall under
+the mountain and detonate from outside). While `Config.DEBUG_MODE` is true, either can be chosen from the menu. Development happens on the `develop` branch. This is the task-by-task guide. For the reference material, see:
 
 - [`PRD-PaxRomana-XBOX-CSharp-MonoGame.md`](PRD-PaxRomana-XBOX-CSharp-MonoGame.md): what the game must do, and from
   section 10 the architecture, file-by-file contents, conventions and pitfalls.
@@ -14,7 +15,7 @@ Commands run from `PaxRomana-XBOX-CSharp-src/` unless a `cd` says otherwise.
 
 | I want to | Command |
 | --- | --- |
-| Play on this Mac | `cd desktop && dotnet run -c Release` |
+| Play on this Mac | `cd desktop && dotnet run -c Release` (add `-- --level 1` to start on Level One) |
 | Run the rules test | `cd tests && dotnet run -c Release` |
 | Check the code will compile for Xbox | `dotnet build tools/apicheck` |
 | Build the Xbox package | `git push`, then `gh run watch` |
@@ -127,7 +128,7 @@ Example: `dotnet run -c Release -- --console --mute`
 This plays a mission with no window, sound or controller: it starts with **A**, skips the intro (and later lets it
 play through), walks and turns, fires a round and checks the vibration, skips one kill-cam and watches another,
 breaches the gate, opens the keep and the vault, takes the keys, wins, restarts, opens a door and synthesises the
-sound. It prints one line per check (70 in all, including that the four voice-over clips are present and fit their cards) and exits non-zero if any fails. It
+sound. It prints one line per check (127 in all, including that the four voice-over clips are present and fit their cards) and exits non-zero if any fails. It
 takes a few seconds.
 
     cd PaxRomana-XBOX-CSharp-src
@@ -152,7 +153,7 @@ control) is tabulated in the PRD, section 10.13.
 
 | Path | Contents |
 | --- | --- |
-| `Game/` | The whole game. `GameSim.cs` is one mission (rules, input, haptics); `Renderer.cs` and `HudRenderer.cs` draw it; `PaxGame.cs` is the window, loader and device input. |
+| `Game/` | The whole game. `Level.cs` is what every level shares; `Castle.cs` and `LevelOne.cs` are the two places; `GameSim.cs` is one mission (rules, input, haptics); `Renderer.cs` and `HudRenderer.cs` draw it; `PaxGame.cs` is the window, loader and device input. |
 | `xbox/` | The UWP app: project, manifest, tiles and a 49-line entry point around `Game/`. |
 | `desktop/` | The desktop launcher and the `--shots` mode. |
 | `tests/` | The rules test. |

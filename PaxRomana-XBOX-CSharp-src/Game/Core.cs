@@ -17,6 +17,9 @@ namespace PaxRomana
         public static readonly Vector3 SUN_DIR = Vector3.Normalize(new Vector3(-0.52f, 0.66f, 0.50f));   // high summer sun, early afternoon
         // The U-235 enrichment works beyond the valley: scenery in this level, the setting of the next ones.
         public const float WORKS_X = 450, WORKS_Z = -800, WORKS_H = 18;
+        // While true, either level can be chosen from the title and pause menus (D-pad left / right). Set it to
+        // false for a release build: Level One then opens only after Level Zero has been won in the same session.
+        public static readonly bool DEBUG_MODE = true;
         // true: the garrison flies the historical flag. false: a plain black cross on the white disc, for places
         // where showing the historical symbol is restricted.
         public static readonly bool HISTORICAL_INSIGNIA = true;

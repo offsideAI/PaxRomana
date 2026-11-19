@@ -320,12 +320,16 @@ namespace PaxRomana
         static float[][] Pts(params float[] xz) { float[][] p = new float[xz.Length / 2][]; for (int i = 0; i < p.Length; i++) p[i] = new[] { xz[i * 2], xz[i * 2 + 1] }; return p; }
         static float[][] Slice(float[][] a, int from, int to) { float[][] r = new float[to - from][]; Array.Copy(a, from, r, 0, to - from); return r; }
 
-        Soldier Add(Route route, float s = 0, float lat = 0, bool hold = false, float face = 0, bool centurion = false, float speed = 1.25f)
+        public Soldier Add(Route route, float s = 0, float lat = 0, bool hold = false, float face = 0, bool centurion = false, float speed = 1.25f)
         {
             Soldier so = new Soldier(route, s, lat, hold, face, centurion, speed);
             Soldiers.Add(so);
             return so;
         }
+
+        // An empty garrison: the level posts its own soldiers with Add, then calls Seal.
+        public Garrison() { }
+        public void Seal() { Total = Soldiers.Count; }
 
         public Garrison(Castle castle)
         {

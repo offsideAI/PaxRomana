@@ -1,4 +1,4 @@
-# Pax Romana, Level Zero: The Keys (native C#)
+# Pax Romana (native C#): Level Zero and Level One
 
 A first-person sniper game for Xbox, written in C#. There is no web view and no JavaScript: the console runs compiled
 C# on [MonoGame](https://monogame.net) (Direct3D 11, XAudio2, the Xbox controller API). It began as a rewrite of the
@@ -13,6 +13,24 @@ subvert it from the inside.
 The level opens with an intro: a "Level Zero" title card and three briefing cards over a flight across the valley,
 the works and the castle, narrated by a recorded voice-over. It runs for about 40 seconds, plays once per session,
 and **A** skips it.
+
+**Level One.** The keys open the service lock of the enrichment facility under BlitzScheiss Mountain. Four
+interlocks stand between you and the centrifuge hall, each a room with a puzzle:
+
+1. **Weight.** A door that stays open only while a pressure plate is held down. Carry the crate onto the plate.
+2. **Beam.** A beam of light has to reach its receiver. Turn the two mirrors to steer it.
+3. **Targets.** Three wall targets each stay lit for eight seconds after a rifle round hits them. Light all three at once.
+4. **Gap.** A plate on the far side of a gap too wide to cross. Two linked gates carry you, and the crate in your
+   hands, from one side to the other.
+
+Then clear the five guards in the centrifuge hall, stand at the cascade controls for six seconds to plant the
+device, leave by the service tunnel (shoot the lock of its blast door, or put a charge on it), and once you are
+clear of the mountain press **A** to detonate.
+
+**Choosing a level.** On the title menu and the pause menu, D-pad left or right (or the arrow keys) switches between
+the two levels. That is a development aid, switched by `Config.DEBUG_MODE` in `Game/Core.cs`: set it to `false` and
+Level One opens only after Level Zero has been won in the same session. Winning Level Zero always leads on to
+Level One.
 
 Your rifle fires sniper rounds and **explosive charges** (8 per mission). A charge flies the same trajectory as a
 bullet, kills everything within about 8 m of where it lands, and blows doors and the castle gate off their hinges.
@@ -51,7 +69,8 @@ to be compiled or loaded from files:
 | D-pad up / down, or Y | Zoom |
 | D-pad left / right | Sight zero, 100 to 600 m |
 | X | Reload |
-| A | Open or close the nearest door, skip the intro or the kill-cam |
+| A | Use: open or close a door, pick up or put down a crate, turn a mirror, detonate. Also skips an intro or the kill-cam |
+| D-pad left / right, on a menu | Choose the level (while `DEBUG_MODE` is on) |
 | B / click right stick | Crouch / prone |
 | View | Show all controls |
 | Menu | Pause |
@@ -103,6 +122,7 @@ Options go after `--`:
 
     dotnet run -c Release -- --fullscreen
     dotnet run -c Release -- --console        # behave as on the Xbox: controller prompts only
+    dotnet run -c Release -- --level 1        # start on Level One
     dotnet run -c Release -- --mute
     dotnet run -c Release -- --shots out      # render a fixed set of views to out/*.png and quit
     dotnet run -c Release -- --voice-check    # load the intro voice-over as the game does, list it and quit (plays nothing)
@@ -114,8 +134,9 @@ Options go after `--`:
 
 Runs a mission without a window: starts with **A**, skips the intro (and later lets it play through), walks and turns
 with the sticks, fires a round and checks the vibration it produces, skips one kill-cam and watches another, breaches
-the gate with a charge, opens the keep and the vault, takes the keys, wins, restarts, opens a door by hand, and
-synthesises the sound clips. It exits with a non-zero code if any check fails. The GitHub workflow runs it before every Xbox build.
+the gate with a charge, opens the keep and the vault, takes the keys, wins, restarts and opens a door by hand. It
+then plays Level One from the service lock to the detonation, solving each interlock with the controller, and
+finally synthesises the sound clips. It exits with a non-zero code if any check fails. The GitHub workflow runs it before every Xbox build.
 
 `dotnet build tools/apicheck` compiles `Game/` against .NET Standard 2.0 and C# 7.3, the limits of the Xbox build, so
 code the console cannot compile is caught without Windows.

@@ -71,20 +71,17 @@ namespace PaxRomana
 
     public sealed class Door
     {
-        public string Name; public Solid Solid; public float X, Z, Reach, Amt, Want; public bool Broken, Iron;
+        public string Name; public Solid Solid; public float X, Z, Y, Reach, Amt, Want; public bool Broken, Iron;
+        public bool Auto;        // opened and closed by the level's machinery, not by hand, and too heavy to blow in
+        public bool Sealed;      // cannot be opened by hand: it has to be blown in
         public readonly List<DoorLeaf> Leaves = new List<DoorLeaf>();
     }
 
     public struct Gap { public float At, W, H; public Gap(float at, float w, float h) { At = at; W = w; H = h; } }
 
-    public sealed class Castle
+    public sealed class Castle : Site
     {
         public const float P = Config.PLATEAU;
-        public readonly Builder B = new Builder();
-        public readonly List<Solid> Solids = new List<Solid>();
-        public readonly List<Door> Doors = new List<Door>();
-        public readonly List<Banner> Banners = new List<Banner>();
-        public readonly List<Vector3> Smoke = new List<Vector3>(), Torches = new List<Vector3>();
         public float KeepX, KeepZ, KeepTop, KeepHalf, GateTop;
         public const float CapX = 0, CapZ = -14.2f, CapR = 2.3f;      // in front of the strongbox in the vault of the keep
         public const float PoleX = 0, PoleZ = 15;                      // the flagpole in the courtyard
@@ -197,13 +194,7 @@ namespace PaxRomana
             Solids.Add(Solid.Box(x - w / 2, x + w / 2, z - d / 2, z + d / 2));
         }
 
-        // Each leaf swings on a hinge; the door's solid blocks the doorway until the door is open.
-        void AddDoor(string name, bool iron, float h, float x0, float x1, float z0, float z1, float[][] leaves)
-        {
-            Door d = new Door { Name = name, Iron = iron, Solid = Solid.Box(x0, x1, z0, z1), X = (x0 + x1) / 2, Z = (z0 + z1) / 2, Reach = 2.6f + Math.Max(x1 - x0, z1 - z0) / 2 };
-            foreach (float[] l in leaves) d.Leaves.Add(new DoorLeaf { Pivot = new Vector3(l[0], P, l[1]), W = l[2], H = h, Closed = l[3], Open = l[4], Angle = l[3] });
-            Solids.Add(d.Solid); Doors.Add(d);
-        }
+        void AddDoor(string name, bool iron, float h, float x0, float x1, float z0, float z1, float[][] leaves) { AddDoor(name, iron, h, x0, x1, z0, z1, leaves, P); }
 
         public static Castle Build()
         {
@@ -439,16 +430,6 @@ namespace PaxRomana
             B.Add("iron", Geo.Cylinder(0.09f, 0.12f, 12, 8).Translate(PoleX, P + 6, PoleZ));
             Solids.Add(Solid.Circle(PoleX, PoleZ, 0.2f));
             Banners.Add(new Banner { W = 4.6f, H = 2.3f, Sx = 12, Sy = 5, Pos = new Vector3(PoleX, P + 10.6f, PoleZ), RotY = -0.35f, Flag = true });
-        }
-
-        // Puts the doors back to how a mission starts.
-        public void Reset()
-        {
-            foreach (Door d in Doors)
-            {
-                d.Amt = d.Want = 0; d.Broken = false; d.Solid.Off = false;
-                foreach (DoorLeaf l in d.Leaves) l.Angle = l.Closed;
-            }
         }
     }
 

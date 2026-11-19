@@ -95,9 +95,9 @@ namespace PaxRomana
             for (float t = 0; t < 1.6f && hit == null; t += dt)
             {
                 q = p;
-                v.Y -= Config.GRAVITY * dt; v += Config.WIND * dt;
+                v.Y -= Config.GRAVITY * dt; v += W.World.Wind * dt;
                 p += v * dt;
-                if (p.Y < Terrain.GroundAt(p.X, p.Z)) return null;
+                if (p.Y < W.World.Arena.Ground(p.X, p.Z)) return null;
                 foreach (Soldier s in W.Garrison.Soldiers)
                 {
                     if (!s.Alive || Math.Abs(s.Pos.X - p.X) + Math.Abs(s.Pos.Z - p.Z) > 12) continue;
@@ -121,7 +121,7 @@ namespace PaxRomana
         void Step(Bullet b, float dt)
         {
             Vector3 p0 = b.Pos;
-            b.Vel.Y -= Config.GRAVITY * dt; b.Vel += Config.WIND * dt;
+            b.Vel.Y -= Config.GRAVITY * dt; b.Vel += W.World.Wind * dt;
             Vector3 p1 = b.Pos + b.Vel * dt;
             Vector3 d = p1 - p0; float len = d.Length(); d /= len;
             float best = 2; HitResult res = null;
@@ -145,8 +145,8 @@ namespace PaxRomana
             {
                 float t = (float)i / steps; if (t >= best) break;
                 Vector3 v = p0 + d * (len * t);
-                float gy = Terrain.GroundAt(v.X, v.Z);
-                if (v.Y < Math.Max(gy, 0)) { best = Math.Max(0, t - 0.5f / steps); res = new HitResult { Type = gy < 0 ? "water" : "dirt", Normal = Vector3.Up }; break; }
+                float gy = W.World.Arena.Ground(v.X, v.Z); bool water = W.World.Arena.Water;
+                if (v.Y < (water ? Math.Max(gy, 0) : gy)) { best = Math.Max(0, t - 0.5f / steps); res = new HitResult { Type = water && gy < 0 ? "water" : "dirt", Normal = Vector3.Up }; break; }
             }
             b.T += dt;
             if (res == null) { b.Pos = p1; if (b.T > 4) { b.Done = true; b.Result = new HitResult { Type = "none" }; } return; }
@@ -169,6 +169,7 @@ namespace PaxRomana
                 if (res.Type == "water") W.Fx.Splash(b.Pos); else W.Fx.Dust(b.Pos, res.Normal, res.Type);
                 W.Audio.Impact(res.Type == "stone" ? "stone" : "dirt", delay, dist);
                 W.Garrison.AlertAround(b.Pos, 9, 9, 7);
+                W.Mission.BulletHit(b.Pos);
             }
         }
 

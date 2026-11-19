@@ -39,7 +39,6 @@ namespace PaxRomana
         static readonly float[] SPEED = { 4.2f, 2.1f, 0.8f };
         const float RADIUS = 0.4f;                 // body radius
         const float SWIM_Y = -1.35f;               // feet height when afloat (water surface is y = 0)
-        const float EDGE = 14, X0 = Config.INNER_X0 + EDGE, X1 = Config.INNER_X0 + Config.INNER_SIZE - EDGE, Z0 = Config.INNER_Z0 + EDGE, Z1 = Config.INNER_Z0 + Config.INNER_SIZE - EDGE;
         const float DECK = 2.7f;                   // bridge half-width
         static readonly List<Solid> PIERS = MakePiers();
         static List<Solid> MakePiers()
@@ -64,11 +63,14 @@ namespace PaxRomana
         public Action OnEdge, OnHeartbeat;
         bool padSprint; float turnT, stepAcc, beatT, swayX, swayY, lookT;
 
-        public Player(IList<Solid> solids, IAudio audio, List<Soldier> soldiers, Pad pad, KeyMouse km)
+        readonly Arena arena;
+
+        public Player(Arena arena, IList<Solid> solids, IAudio audio, List<Soldier> soldiers, Pad pad, KeyMouse km)
         {
             this.solids = solids; this.audio = audio; this.soldiers = soldiers; this.pad = pad; this.km = km;
-            Pos = new Vector3(Config.SPAWN_X, Terrain.GroundAt(Config.SPAWN_X, Config.SPAWN_Z), Config.SPAWN_Z);
-            Yaw = M.Atan2(Config.SPAWN_X, Config.SPAWN_Z);
+            this.arena = arena;
+            Pos = new Vector3(arena.Spawn.X, arena.Ground(arena.Spawn.X, arena.Spawn.Z), arena.Spawn.Z);
+            Yaw = arena.SpawnYaw;
             T = M.Rand() * 100;
         }
 
@@ -86,8 +88,8 @@ namespace PaxRomana
             }
             // bridge: walk on from either bank, parapets keep you on the deck, swim under the arches
             float bx = Config.BRIDGE_X, by = Config.BRIDGE_Y;
-            float g = Terrain.GroundAt(Pos.X, Pos.Z);
-            if (Pos.Z > Config.BRIDGE_Z0 && Pos.Z < Config.BRIDGE_Z1 && Math.Abs(Pos.X - bx) < DECK)
+            float g = arena.Ground(Pos.X, Pos.Z);
+            if (arena.Bridge && Pos.Z > Config.BRIDGE_Z0 && Pos.Z < Config.BRIDGE_Z1 && Math.Abs(Pos.X - bx) < DECK)
             {
                 if (!OnBridge)
                 {
@@ -100,8 +102,9 @@ namespace PaxRomana
             {
                 if (g < by + 0.9f) Pos.X = M.Clamp(Pos.X, bx - 2.1f, bx + 2.1f);    // between the parapets
             }
-            else if (g < by - 0.5f) Collision.Resolve(ref Pos, RADIUS, PIERS);
+            else if (arena.Bridge && g < by - 0.5f) Collision.Resolve(ref Pos, RADIUS, PIERS);
             // edge of the playable valley
+            float X0 = arena.X0, X1 = arena.X1, Z0 = arena.Z0, Z1 = arena.Z1;
             if (Pos.X < X0 || Pos.X > X1 || Pos.Z < Z0 || Pos.Z > Z1)
             {
                 Pos.X = M.Clamp(Pos.X, X0, X1); Pos.Z = M.Clamp(Pos.Z, Z0, Z1);
@@ -191,11 +194,11 @@ namespace PaxRomana
             else MoveAmt *= 0.9f;
 
             // footing: ground, bridge deck, or afloat in the river
-            float g = Terrain.GroundAt(Pos.X, Pos.Z);
-            Depth = OnBridge ? 0 : Math.Max(0, -g);
-            Swimming = !OnBridge && g < SWIM_Y;
+            float g = arena.Ground(Pos.X, Pos.Z);
+            Depth = OnBridge || !arena.Water ? 0 : Math.Max(0, -g);
+            Swimming = arena.Water && !OnBridge && g < SWIM_Y;
             if (Swimming) Stance = 0;
-            float footY = OnBridge ? Math.Max(g, Config.BRIDGE_Y) : Math.Max(g, SWIM_Y);
+            float footY = OnBridge ? Math.Max(g, Config.BRIDGE_Y) : arena.Water ? Math.Max(g, SWIM_Y) : g;
             float dy = footY - Pos.Y;
             Pos.Y = Math.Abs(dy) > 1.5f ? footY : Pos.Y + dy * Math.Min(1, dt * 16);
             Eye += (EYE[Stance] - Eye) * Math.Min(1, dt * 7);

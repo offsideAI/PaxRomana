@@ -37,10 +37,50 @@ rules correctly but may use the old names.
 
 Unchanged: the map layout and coordinates, the 29 posts and patrol routes, alert rules, ballistics, kill-cam,
 explosive charges, door mechanics, controls, haptics, sound, architecture, build and deployment. The rules test now
-has 70 checks, including the intro (skipped, and played through), the walk through the keep into the vault, and the
+has 127 checks, including the intro (skipped, and played through), the walk through the keep into the vault, and the
 voice-over clips.
 
-Later levels (infiltrating and subverting the enrichment zone) are not designed or built.
+### Level One: BlitzScheiss Mountain (added 2026-11-18)
+
+The agent is put down in the service lock of an enrichment facility under BlitzScheiss Mountain and has to reach the
+centrifuge hall, destroy the cascade and get out. The puzzle rooms are original designs in the spirit of
+physics-puzzle games: nothing in them is taken from another game.
+
+| Stage | Objective text | What has to happen |
+| --- | --- | --- |
+| 0 | Interlock 1 of 4: hold the door open with weight | Carry the crate onto the pressure plate. The door is open only while the plate is down. |
+| 1 | Interlock 2 of 4: bring the beam home to the receiver | Turn both mirrors (A when beside one) so the beam from the emitter reaches the receiver. |
+| 2 | Interlock 3 of 4: light all three targets at once | Each target stays lit for 8 s after a rifle round (or a blast) hits it. All three lit together latches the door open. |
+| 3 | Interlock 4 of 4: get the crate across the gap | A 10 m gap splits the room. Walking into the blue gate puts the player out of the orange one on the far side, with the crate; the far plate opens the door to the hall. Falling into the gap puts the player back on the side they fell from. |
+| 4 | Clear the guards in the centrifuge hall: *n* left | Five guards: four on patrol and the duty officer. |
+| 5, 6 | Plant the device at the cascade controls / Stay at the controls | Stand inside the marker ring for 6 s. Blocked ("Contested") while a guard lives. |
+| 7 | Get out of the mountain: up the service tunnel | The tunnel door opens when the device is armed. Half way up, a blast door: shoot the red lock above it, or put a charge on it. |
+| 8 | Clear of the mountain: detonate | Past 16 m from the tunnel mouth the prompt "Detonate" appears; A sets the device off. |
+| 9 | The centrifuges are destroyed | End screen after 6 s. |
+
+- **Layout.** Service lock, four chambers 18 m wide in a line running north, a 44 × 58 m hall with 120 centrifuges
+  in two blocks either side of a cross aisle, and a 73 m tunnel that climbs 12 m to a concrete portal in the east
+  face of the mountain. Floor level is y = 100.
+- **Use button.** A (O on the keyboard) does whichever applies, in this order: put down the crate being carried,
+  pick up a crate within 2 m, turn a mirror within 2.2 m, detonate, open or close a door.
+- **Crates** are carried in front of the player and block the beam and the player when on the floor. One dropped
+  into the gap is replaced where it first stood.
+- **Doors** held by an interlock cannot be opened by hand or blown in.
+- **Light.** Cold strip lighting and a dark haze inside, blending to daylight over the last 20 m of the tunnel.
+- **Intro.** A title card "LEVEL ONE · BLITZSCHEISS MOUNTAIN" and two briefing cards, about 21 s, without narration.
+- **Haptics.** A tick on each interlock solved, a pulse on a gate, the same building pulse while planting as at the
+  strongbox, and a long full-strength rumble on detonation.
+- **Choosing a level.** With `Config.DEBUG_MODE` true (the current setting), D-pad left or right on the title or pause
+  menu switches level. With it false, Level One opens only after Level Zero is won in the same session; there is no
+  saved progress. Winning Level Zero leads to Level One in both cases.
+- **Not in this level:** jumping, physics for the crate beyond carrying and dropping, guards that shoot, a time limit
+  on the escape, and a voice-over.
+- **Verified:** the rules test plays the whole level with the controller (127 checks in all); 16 rendered views were
+  looked at on the Mac. Not verified: anything on the console.
+- **Code.** `Level.cs` (new: `Site`, `Arena`, `LightRig`, `Mission`, `Prop`, `Beam`), `LevelOne.cs` (new:
+  `Facility`, `Sabotage`), and `World.BuildLevelOne`. Level Zero's rules (`Capture`) now derive from `Mission`.
+
+Further levels are not designed or built.
 
 ### Voice-over (added 2026-11-18)
 
@@ -429,7 +469,7 @@ workflow that runs the test before it builds the package.
 
 | Check | Result |
 | --- | --- |
-| Headless rules test (`tests/`), 70 checks | Passes. Last run 2026-11-18 after running with LB was added. |
+| Headless rules test (`tests/`), 127 checks | Passes. Last run 2026-11-18 after Level One was added; it plays both levels through. |
 | Shared code compiles against .NET Standard 2.0 and C# 7.3 (`tools/apicheck`) | Passes |
 | Shared code compiles against the real `MonoGame.Framework.WindowsUniversal` 3.8.1.303 assembly | Passed, in a scratch project on the Mac |
 | GitHub Actions workflow: rules test on Windows, UWP project and `Program.cs` compile with .NET Native, package signed and uploaded | Passed on the first run, 2026-11-18 (run 44402866842, commit 3575a97). That was the build before the Level Zero re-theme; the re-themed code has not been through the workflow yet. |

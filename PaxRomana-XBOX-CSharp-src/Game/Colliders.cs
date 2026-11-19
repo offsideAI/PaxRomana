@@ -14,10 +14,10 @@ namespace PaxRomana
         public List<Door> Doors = new List<Door>();
         public int Triangles { get { return ta.Length; } }
 
-        public Colliders(Castle castle)
+        public Colliders(Site castle, string[] parts)
         {
             List<Vector3> a = new List<Vector3>(), b = new List<Vector3>(), c = new List<Vector3>(); List<bool> w = new List<bool>();
-            foreach (string key in Castle.ColliderKeys)
+            foreach (string key in parts)
             {
                 Geo g;
                 if (!castle.B.Parts.TryGetValue(key, out g)) continue;

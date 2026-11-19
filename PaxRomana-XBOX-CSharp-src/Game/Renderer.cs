@@ -47,6 +47,9 @@ namespace PaxRomana
         Mat soldierMat, timberMat, ironMat, bannerMat;
         VertexBuffer[] grassVb; IndexBuffer grassIb; int grassCap;
         World world;
+        readonly List<Mesh> owned = new List<Mesh>();          // every mesh made for the current world, freed when the level changes
+        readonly List<Mesh> propMeshes = new List<Mesh>();     // one per prop of the site, in the same order
+        LightRig rig = LightRig.Outdoor();
         readonly Matrix[] parts = new Matrix[Soldier.PARTS];
         // dynamic sprites
         readonly VertexPositionColorTexture[] qv = new VertexPositionColorTexture[4 * 4096]; readonly short[] qi = new short[6 * 4096]; int qn;
@@ -112,6 +115,7 @@ namespace PaxRomana
             for (int i = 0; i < v.Length; i++) v[i] = new Vtx(g.P[i], g.N[i], g.C != null ? g.C[i] : Color.White, new Vector2(g.T[i].X, 1 - g.T[i].Y));
             Mesh m = new Mesh { Vb = new VertexBuffer(gd, Vtx.Decl, v.Length, BufferUsage.WriteOnly), Prims = v.Length / 3, Bs = BoundingSphere.CreateFromPoints(g.P) };
             m.Vb.SetData(v);
+            owned.Add(m);
             return m;
         }
 
@@ -125,6 +129,7 @@ namespace PaxRomana
                 Prims = g.Idx.Length / 3, Bs = BoundingSphere.CreateFromPoints(g.P),
             };
             m.Vb.SetData(v); m.Ib.SetData(g.Idx);
+            owned.Add(m);
             return m;
         }
 
@@ -135,6 +140,7 @@ namespace PaxRomana
             for (int i = 0; i < v.Length; i++) v[i] = new VertexPositionColorTexture(g.P[i], g.C[i], new Vector2(g.T[i].X, 1 - g.T[i].Y));
             Mesh m = new Mesh { Vb = new VertexBuffer(gd, VertexPositionColorTexture.VertexDeclaration, v.Length, BufferUsage.WriteOnly), Prims = v.Length / 3 };
             m.Vb.SetData(v);
+            owned.Add(m);
             return m;
         }
 
@@ -146,10 +152,20 @@ namespace PaxRomana
 
         public void SetWorld(World w)
         {
+            // free what the previous level put on the graphics device
+            foreach (Mesh old in owned) { if (old.Vb != null) old.Vb.Dispose(); if (old.Ib != null) old.Ib.Dispose(); }
+            owned.Clear(); terrain.Clear(); statics.Clear(); emissive.Clear(); chunks.Clear(); banners.Clear(); doorLeaves.Clear(); propMeshes.Clear();
+            if (grassVb != null) { foreach (VertexBuffer vb in grassVb) vb.Dispose(); grassVb = null; }
+            if (grassIb != null) { grassIb.Dispose(); grassIb = null; }
+            keys = null; ringMesh = null; waterMesh = null;
+
             world = w;
             Textures t = w.Tex;
-            stone = Upload(t.Stone); slate = Upload(t.Slate); ground = Upload(t.Ground); rock = Upload(t.Rock); bark = Upload(t.Bark); timber = Upload(t.Timber);
-            leather = Upload(t.Leather); water = Upload(t.Water); leaves = Upload(t.Leaves); banner = Upload(t.Banner); windows = Upload(t.Windows); cloud = Upload(t.Cloud);
+            if (stone == null)          // the textures are shared by every level: upload them once
+            {
+                stone = Upload(t.Stone); slate = Upload(t.Slate); ground = Upload(t.Ground); rock = Upload(t.Rock); bark = Upload(t.Bark); timber = Upload(t.Timber);
+                leather = Upload(t.Leather); water = Upload(t.Water); leaves = Upload(t.Leaves); banner = Upload(t.Banner); windows = Upload(t.Windows); cloud = Upload(t.Cloud);
+            }
             if (Soft == null) LoadBasics(t);
 
             foreach (IndexedMesh m in w.Terrain) terrain.Add(Up(m));
@@ -171,8 +187,18 @@ namespace PaxRomana
                 { "tentDark", new Mat { Tex = leather, Colour = M.Hex(0x4d5640) * 1.3f, TwoSided = true } },
                 { "ember", new Mat { Colour = new Vector3(1.0f, 0.42f, 0.1f), Lit = false } },
                 { "works", new Mat { Tex = windows, Colour = new Vector3(1.05f), Spec = 0.03f } },           // factory walls of the enrichment works
+                // Level One: the facility under the mountain
+                { "panel", new Mat { Tex = stone, Colour = M.Hex(0xdcdedc) * 1.45f, Spec = 0.05f } },         // pale wall panels
+                { "floor", new Mat { Tex = stone, Colour = M.Hex(0x6c7076) * 1.1f, Spec = 0.12f } },
+                { "ceiling", new Mat { Colour = M.Hex(0x3a3d42) } },
+                { "steel", new Mat { Colour = M.Hex(0x9aa1a8), Spec = 0.7f } },
+                { "rock", new Mat { Tex = rock, Colour = M.Hex(0xcfc8b8) * 1.3f } },
+                { "hazard", new Mat { Colour = M.Hex(0xd8a61c), Spec = 0.1f } },
+                { "lamp", new Mat { Colour = new Vector3(1.0f, 0.98f, 0.92f), Lit = false } },
             };
-            foreach (Builder b in new[] { w.Castle.B, w.Works.B })
+            List<Builder> builders = new List<Builder> { w.Site.B };
+            if (w.Works != null) builders.Add(w.Works.B);
+            foreach (Builder b in builders)
                 foreach (KeyValuePair<string, Geo> kv in b.Parts)
                 {
                     Mat mat; if (!mats.TryGetValue(kv.Key, out mat)) mat = new Mat();
@@ -180,9 +206,10 @@ namespace PaxRomana
                     if (mesh == null) continue;
                     (mat.Lit ? statics : emissive).Add(new Part { Mesh = mesh, Mat = mat });
                 }
-            keys = Up(w.Castle.Keys);
+            if (w.Castle != null) keys = Up(w.Castle.Keys);
+            foreach (Prop pr in w.Site.Props) propMeshes.Add(Up(pr.Shape));
 
-            foreach (Door d in w.Castle.Doors)
+            foreach (Door d in w.Site.Doors)
                 foreach (DoorLeaf l in d.Leaves)
                 {
                     LeafGpu lg = new LeafGpu { D = d, L = l, Leaf = Up(TileUv(Geo.Box(l.W, l.H, 0.14f).Translate(l.W / 2, l.H / 2, 0))), Straps = new Mesh[1] };
@@ -192,7 +219,7 @@ namespace PaxRomana
                     doorLeaves.Add(lg);
                 }
 
-            foreach (Banner b in w.Castle.Banners)
+            foreach (Banner b in w.Site.Banners)
             {
                 Geo g = Geo.Plane(b.W, b.H, b.Sx, b.Sy);
                 if (b.Flag) g.Translate(b.W / 2, 0, 0);
@@ -220,22 +247,26 @@ namespace PaxRomana
                 banners.Add(bg);
             }
             bannerMat = new Mat { Tex = banner, TwoSided = true, Colour = new Vector3(1.25f) };
-            ringMesh = Up(Geo.Torus(Castle.CapR, 0.07f, 6, 72).RotateX(M.HALF_PI).Translate(Castle.CapX, Config.PLATEAU + 0.12f, Castle.CapZ));
+            if (w.Castle != null) ringMesh = Up(Geo.Torus(Castle.CapR, 0.07f, 6, 72).RotateX(M.HALF_PI).Translate(Castle.CapX, Config.PLATEAU + 0.12f, Castle.CapZ));
             shockMesh = Up(Geo.Ring(0.82f, 1, 48));
 
-            foreach (Dictionary<long, VegChunk> map in new[] { w.Veg.Near, w.Veg.Far })
-                foreach (VegChunk c in map.Values)
-                {
-                    Vector3 centre = (c.Min + c.Max) * 0.5f;
-                    chunks.Add(new ChunkGpu { Trunk = Up(c.Trunk), Rock = Up(c.Rock), Leaf = UpLeaf(c.Leaf), Bs = new BoundingSphere(centre, (c.Max - c.Min).Length() * 0.5f) });
-                }
-            Grass gr = w.Veg.Grass;
-            grassCap = gr.Cap;
-            grassVb = new VertexBuffer[gr.Cells.Length];
-            for (int i = 0; i < grassVb.Length; i++) grassVb[i] = new VertexBuffer(gd, VertexPositionColor.VertexDeclaration, grassCap * Grass.TuftVerts, BufferUsage.WriteOnly);
-            grassIb = new IndexBuffer(gd, IndexElementSize.SixteenBits, grassCap * Grass.TuftIndices, BufferUsage.WriteOnly);
-            grassIb.SetData(Grass.Indices(grassCap));
-            foreach (GrassCell c in gr.Cells) c.Dirty = c.N > 0;
+            if (w.Veg != null)
+            {
+                foreach (Dictionary<long, VegChunk> map in new[] { w.Veg.Near, w.Veg.Far })
+                    foreach (VegChunk c in map.Values)
+                    {
+                        Vector3 centre = (c.Min + c.Max) * 0.5f;
+                        chunks.Add(new ChunkGpu { Trunk = Up(c.Trunk), Rock = Up(c.Rock), Leaf = UpLeaf(c.Leaf), Bs = new BoundingSphere(centre, (c.Max - c.Min).Length() * 0.5f) });
+                    }
+                Grass gr = w.Veg.Grass;
+                grassCap = gr.Cap;
+                grassVb = new VertexBuffer[gr.Cells.Length];
+                for (int i = 0; i < grassVb.Length; i++) grassVb[i] = new VertexBuffer(gd, VertexPositionColor.VertexDeclaration, grassCap * Grass.TuftVerts, BufferUsage.WriteOnly);
+                grassIb = new IndexBuffer(gd, IndexElementSize.SixteenBits, grassCap * Grass.TuftIndices, BufferUsage.WriteOnly);
+                grassIb.SetData(Grass.Indices(grassCap));
+                foreach (GrassCell c in gr.Cells) c.Dirty = c.N > 0;
+
+            }
 
             soldier = new Mesh[Soldier.PARTS][];
             for (int i = 0; i < Soldier.PARTS; i++) soldier[i] = new[] { Up(w.SoldierParts[i][0]), w.SoldierParts[i][1] == w.SoldierParts[i][0] ? null : Up(w.SoldierParts[i][1]) };
@@ -244,6 +275,7 @@ namespace PaxRomana
             bulletMesh = Up(Geo.Cylinder(0.004f, 0.012f, 0.09f, 10).RotateX(-M.HALF_PI));
 
             // river and lakes: one big sheet at y = 0
+            if (w.Arena.Water)
             {
                 Geo g = Geo.Plane(9000, 9000).RotateX(-M.HALF_PI);
                 for (int i = 0; i < g.Count; i++) g.T[i] = g.T[i] * 500;
@@ -251,9 +283,10 @@ namespace PaxRomana
             }
             // sky dome, coloured per vertex: haze at the horizon, summer blue overhead, a glow around the sun
             {
+                if (skyMesh != null) skyMesh.Vb.Dispose();
                 Geo g = Geo.Sphere(1, 48, 24);
                 VertexPositionColor[] v = new VertexPositionColor[g.Count];
-                for (int i = 0; i < v.Length; i++) v[i] = new VertexPositionColor(g.P[i], SkyColour(g.P[i]));
+                for (int i = 0; i < v.Length; i++) v[i] = new VertexPositionColor(g.P[i], SkyColour(g.P[i], w.Outdoor.SunDir));
                 skyMesh = new Mesh { Vb = new VertexBuffer(gd, VertexPositionColor.VertexDeclaration, v.Length, BufferUsage.WriteOnly), Prims = v.Length / 3 };
                 skyMesh.Vb.SetData(v);
             }
@@ -276,17 +309,28 @@ namespace PaxRomana
             return g;
         }
 
-        static Color SkyColour(Vector3 d)
+        static Color SkyColour(Vector3 d, Vector3 sunDir)
         {
             float t = M.Clamp(d.Y);
             Vector3 zenith = new Vector3(0.17f, 0.40f, 0.80f), horizon = Lighting.Fog;
             Vector3 c = Vector3.Lerp(horizon, zenith, M.Pow(t, 0.5f));
-            float sun = Math.Max(0, Vector3.Dot(d, Config.SUN_DIR));
+            float sun = Math.Max(0, Vector3.Dot(d, sunDir));
             // a brighter horizon on the sun's side, and a glow around the disc
             c += new Vector3(0.14f, 0.11f, 0.05f) * M.Pow(sun, 3) * (1 - M.Smoothstep(0.0f, 0.5f, d.Y));
             c += new Vector3(0.5f, 0.44f, 0.3f) * M.Pow(sun, 28);
             if (d.Y < 0) c = Vector3.Lerp(c, horizon, M.Clamp(-d.Y * 6));
             return M.Col(c.X, c.Y, c.Z);
+        }
+
+        // The light and the haze of the place the camera is in.
+        void Apply(LightRig r)
+        {
+            rig = r;
+            fx.AmbientLightColor = r.Ambient;
+            fx.DirectionalLight0.Direction = -r.SunDir; fx.DirectionalLight0.DiffuseColor = r.Sun; fx.DirectionalLight0.SpecularColor = r.Sun;
+            fx.DirectionalLight1.DiffuseColor = r.Sky;
+            fx.DirectionalLight2.Direction = -r.BounceFrom; fx.DirectionalLight2.DiffuseColor = r.Bounce;
+            fx.FogColor = r.Fog; fx.FogStart = r.FogStart; fx.FogEnd = r.FogEnd;
         }
 
         // ---- state helpers ----------------------------------------------------------------------------------------
@@ -329,6 +373,15 @@ namespace PaxRomana
             qv[i + 2] = new VertexPositionColorTexture(p2, col, new Vector2(1, 0)); qv[i + 3] = new VertexPositionColorTexture(p3, col, new Vector2(0, 0));
             qn++;
         }
+        // A ribbon: the sprite texture is sampled across its width only, so the edges are soft and the length is even.
+        void BeamQuad(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, Color col)
+        {
+            if (qn >= 4096) return;
+            int i = qn * 4;
+            qv[i] = new VertexPositionColorTexture(p0, col, new Vector2(0, 0.5f)); qv[i + 1] = new VertexPositionColorTexture(p1, col, new Vector2(1, 0.5f));
+            qv[i + 2] = new VertexPositionColorTexture(p2, col, new Vector2(1, 0.5f)); qv[i + 3] = new VertexPositionColorTexture(p3, col, new Vector2(0, 0.5f));
+            qn++;
+        }
         void Flush(Texture2D tex, bool fog)
         {
             if (qn == 0) return;
@@ -350,17 +403,22 @@ namespace PaxRomana
             fx.View = view; fx.Projection = proj;
             float clock = sim.Clock;
 
-            gd.Clear(ClearOptions.Target | ClearOptions.DepthBuffer, new Color(Lighting.Fog), 1, 0);
+            float outdoors = sim.Mission.Outdoors;
+            Apply(LightRig.Lerp(world.Indoor, world.Outdoor, outdoors));
+            gd.Clear(ClearOptions.Target | ClearOptions.DepthBuffer, new Color(rig.Fog), 1, 0);
             gd.SamplerStates[0] = SamplerState.AnisotropicWrap;
             gd.BlendState = BlendState.Opaque;
 
             // sky and clouds: no depth, centred on the camera
-            gd.DepthStencilState = DepthStencilState.None; gd.RasterizerState = cullNone;
-            Unlit(null, Vector3.One, 1, false, true);
-            fx.World = Matrix.CreateScale(FAR * 0.5f) * Matrix.CreateTranslation(camPos);
-            fx.CurrentTechnique.Passes[0].Apply();
-            gd.SetVertexBuffer(skyMesh.Vb); gd.DrawPrimitives(PrimitiveType.TriangleList, 0, skyMesh.Prims);
-            DrawClouds(clock);
+            if (outdoors > 0.02f)
+            {
+                gd.DepthStencilState = DepthStencilState.None; gd.RasterizerState = cullNone;
+                Unlit(null, Vector3.One, 1, false, true);
+                fx.World = Matrix.CreateScale(FAR * 0.5f) * Matrix.CreateTranslation(camPos);
+                fx.CurrentTechnique.Passes[0].Apply();
+                gd.SetVertexBuffer(skyMesh.Vb); gd.DrawPrimitives(PrimitiveType.TriangleList, 0, skyMesh.Prims);
+                DrawClouds(clock);
+            }
 
             // ---- opaque ----
             gd.BlendState = BlendState.Opaque; gd.DepthStencilState = DepthStencilState.Default; gd.RasterizerState = cullBack;
@@ -375,6 +433,15 @@ namespace PaxRomana
                 Use(l.D.Iron ? ironMat : timberMat); Draw(l.Leaf, w);
                 Use(ironMat); Draw(l.Straps[0], w);
             }
+            // the level's moving parts that take light: crates, plates, mirrors
+            for (int i = 0; i < propMeshes.Count; i++)
+            {
+                Prop pr = world.Site.Props[i];
+                if (!pr.Visible || !pr.Lit) continue;
+                Use(new Mat { Colour = pr.Colour * 1.2f, Spec = pr.Spec, VCol = pr.Shape.C != null, TwoSided = pr.TwoSided });
+                Draw(propMeshes[i], pr.World);
+            }
+            gd.RasterizerState = cullBack;
             // trunks and boulders
             Mat barkMat = new Mat { Tex = bark, Colour = new Vector3(1.35f) }, rockMat = new Mat { Tex = rock, Colour = M.Hex(0xcfc8b8) * 1.6f };
             Use(barkMat);
@@ -384,44 +451,60 @@ namespace PaxRomana
             DrawSoldiers(sim);
             DrawBanners(sim, clock);
 
-            // grass: unlit, coloured per vertex
-            gd.RasterizerState = cullNone;
-            Unlit(null, Vector3.One, 1, true, true);
-            fx.World = Matrix.Identity;
-            fx.CurrentTechnique.Passes[0].Apply();
-            gd.Indices = grassIb;
-            GrassCell[] cells = world.Veg.Grass.Cells;
-            for (int i = 0; i < cells.Length; i++)
+            if (world.Veg != null)
             {
-                GrassCell c = cells[i];
-                if (c.Dirty) { c.Dirty = false; if (c.N > 0) grassVb[i].SetData(c.V, 0, c.N * Grass.TuftVerts); }
-                if (!c.Visible || c.Draw <= 0 || !Visible(c.Bs)) continue;
-                gd.SetVertexBuffer(grassVb[i]);
-                gd.DrawIndexedPrimitives(PrimitiveType.TriangleList, 0, 0, c.Draw * 9);
-            }
-            // foliage: alpha tested, lighting baked into vertex colours
-            gd.SamplerStates[0] = SamplerState.LinearClamp;
-            leafFx.View = view; leafFx.Projection = proj; leafFx.World = Matrix.Identity; leafFx.Texture = leaves;
-            leafFx.CurrentTechnique.Passes[0].Apply();
-            foreach (ChunkGpu c in chunks)
-            {
-                if (c.Leaf == null || !Visible(c.Bs)) continue;
-                gd.SetVertexBuffer(c.Leaf.Vb); gd.DrawPrimitives(PrimitiveType.TriangleList, 0, c.Leaf.Prims);
+                // grass: unlit, coloured per vertex
+                gd.RasterizerState = cullNone;
+                Unlit(null, Vector3.One, 1, true, true);
+                fx.World = Matrix.Identity;
+                fx.CurrentTechnique.Passes[0].Apply();
+                gd.Indices = grassIb;
+                GrassCell[] cells = world.Veg.Grass.Cells;
+                for (int i = 0; i < cells.Length; i++)
+                {
+                    GrassCell c = cells[i];
+                    if (c.Dirty) { c.Dirty = false; if (c.N > 0) grassVb[i].SetData(c.V, 0, c.N * Grass.TuftVerts); }
+                    if (!c.Visible || c.Draw <= 0 || !Visible(c.Bs)) continue;
+                    gd.SetVertexBuffer(grassVb[i]);
+                    gd.DrawIndexedPrimitives(PrimitiveType.TriangleList, 0, 0, c.Draw * 9);
+                }
+                // foliage: alpha tested, lighting baked into vertex colours
+                gd.SamplerStates[0] = SamplerState.LinearClamp;
+                leafFx.View = view; leafFx.Projection = proj; leafFx.World = Matrix.Identity; leafFx.Texture = leaves;
+                leafFx.CurrentTechnique.Passes[0].Apply();
+                foreach (ChunkGpu c in chunks)
+                {
+                    if (c.Leaf == null || !Visible(c.Bs)) continue;
+                    gd.SetVertexBuffer(c.Leaf.Vb); gd.DrawPrimitives(PrimitiveType.TriangleList, 0, c.Leaf.Prims);
+                }
             }
             gd.SamplerStates[0] = SamplerState.AnisotropicWrap;
 
             // unlit: embers, the marker ring at the strongbox, and the keys until they are taken
             gd.RasterizerState = cullBack;
             foreach (Part p in emissive) { Use(p.Mat); Draw(p.Mesh, Matrix.Identity); }
-            Unlit(null, sim.Capture.Done ? new Vector3(0.3f, 0.9f, 1.0f) : new Vector3(1.0f, 0.78f, 0.25f), 1, false, false);
-            Draw(ringMesh, Matrix.Identity);
-            if (!sim.Capture.Done) { gd.RasterizerState = cullNone; Use(new Mat { Colour = M.Hex(0xe2b84e) * 1.2f, Spec = 0.9f }); Draw(keys, Matrix.Identity); gd.RasterizerState = cullBack; }
+            if (world.Castle != null)
+            {
+                Unlit(null, sim.Mission.Done ? new Vector3(0.3f, 0.9f, 1.0f) : new Vector3(1.0f, 0.78f, 0.25f), 1, false, false);
+                Draw(ringMesh, Matrix.Identity);
+                if (!sim.Mission.Done) { gd.RasterizerState = cullNone; Use(new Mat { Colour = M.Hex(0xe2b84e) * 1.2f, Spec = 0.9f }); Draw(keys, Matrix.Identity); gd.RasterizerState = cullBack; }
+            }
+            // the level's moving parts that glow: status lights, targets, gates
+            for (int i = 0; i < propMeshes.Count; i++)
+            {
+                Prop pr = world.Site.Props[i];
+                if (!pr.Visible || pr.Lit) continue;
+                Unlit(null, pr.Colour, 1, true, false);
+                gd.RasterizerState = pr.TwoSided ? cullNone : cullBack;
+                Draw(propMeshes[i], pr.World);
+            }
+            gd.RasterizerState = cullBack;
             DrawBirds(sim);
 
             // ---- transparent ----
             gd.BlendState = BlendState.NonPremultiplied; gd.DepthStencilState = DepthStencilState.DepthRead;
             // water, drifting slowly
-            Use(new Mat { Tex = water, Colour = new Vector3(0.16f, 0.30f, 0.33f), Spec = 0.9f, Alpha = 0.88f });
+            if (waterMesh != null) Use(new Mat { Tex = water, Colour = new Vector3(0.16f, 0.30f, 0.33f), Spec = 0.9f, Alpha = 0.88f });
             Draw(waterMesh, Matrix.CreateTranslation(60 + (clock * 0.216f) % 18, 0, 190 + (clock * 0.072f) % 18));
             DrawSprites(sim);
         }
@@ -516,7 +599,7 @@ namespace PaxRomana
             Unlit(null, Vector3.One, 1, true, true);
             fx.World = Matrix.Identity;
             fx.CurrentTechnique.Passes[0].Apply();
-            gd.DrawUserPrimitives(PrimitiveType.TriangleList, birdV, 0, n / 3);
+            if (n > 0) gd.DrawUserPrimitives(PrimitiveType.TriangleList, birdV, 0, n / 3);
         }
 
         void DrawSprites(GameSim sim)
@@ -602,11 +685,22 @@ namespace PaxRomana
                 Quad(b.Pos, 0.3f * s, M.Col(1.0f, 0.55f, 0.15f, 1)); Quad(b.Pos, 0.1f * s, M.Col(1.0f, 0.95f, 0.8f, 1));
             }
             Flush(Glow, false);
-            foreach (Vector3 p in world.Castle.Torches) Quad(p, 1.3f, new Color((byte)255, (byte)150, (byte)70, (byte)120));
-            foreach (Vector3 p in world.Castle.Smoke) if (p.Y < Config.PLATEAU) Quad(p, 1.6f, new Color((byte)255, (byte)140, (byte)60, (byte)130));
+            foreach (Vector3 p in world.Site.Torches) Quad(p, 1.3f, new Color((byte)255, (byte)150, (byte)70, (byte)120));
+            if (world.Castle != null) foreach (Vector3 p in world.Site.Smoke) if (p.Y < Config.PLATEAU) Quad(p, 1.6f, new Color((byte)255, (byte)140, (byte)60, (byte)130));
+            foreach (Glow g in world.Site.Glows) Quad(g.Pos, g.Size, g.Colour);
+            // beams: a ribbon that faces the camera, drawn twice for a hot core
+            foreach (Beam b in world.Site.Beams)
+            {
+                Vector3 dir = b.B - b.A, side = Vector3.Cross(dir, camPos - (b.A + b.B) * 0.5f);
+                if (side.LengthSquared() < 1e-8f) continue;
+                side.Normalize();
+                Color outer = M.Col(b.Colour.X, b.Colour.Y, b.Colour.Z, 0.55f), core = M.Col(1, 0.9f, 0.85f, 0.9f);
+                Vector3 w = side * b.Width * 2.2f, c2 = side * b.Width * 0.5f;
+                BeamQuad(b.A - w, b.A + w, b.B + w, b.B - w, outer); BeamQuad(b.A - c2, b.A + c2, b.B + c2, b.B - c2, core);
+            }
             Flush(Glow, true);
             // the sun, high over the valley
-            Vector3 sunPos = camPos + Config.SUN_DIR * 6000;
+            Vector3 sunPos = camPos + world.Outdoor.SunDir * 6000;
             Quad(sunPos, 2200, new Color((byte)255, (byte)236, (byte)200, (byte)60));
             Quad(sunPos, 460, new Color((byte)255, (byte)250, (byte)232, (byte)255));
             Flush(Glow, false);

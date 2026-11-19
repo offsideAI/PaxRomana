@@ -28,10 +28,14 @@ namespace PaxRomana
         public Vector3 FlashPos; public float FlashT;         // explosion flash (0.4 s)
         readonly List<Emitter> emitters = new List<Emitter>();
 
-        public Fx()
+        readonly bool outdoors;
+
+        // outdoors: seeds on the breeze and birds overhead. Underground there are neither.
+        public Fx(bool outdoors = true)
         {
+            this.outdoors = outdoors;
             for (int i = 0; i < MOTES; i++) Motes[i] = new Vector3((M.Rand() - 0.5f) * 2 * MOTE_R, (M.Rand() - 0.5f) * 2 * MOTE_R, (M.Rand() - 0.5f) * 2 * MOTE_R);
-            for (int i = 0; i < 16; i++)
+            for (int i = 0; i < 16 && outdoors; i++)
             {
                 bool flock = i >= 9;
                 Birds.Add(new Bird
@@ -153,7 +157,7 @@ namespace PaxRomana
                 r.Opacity = 0.55f * (1 - r.T) * (1 - r.T);
             }
             // seeds and pollen on the breeze: a box of motes that stays wrapped around the camera; hidden through the scope, where near ones would fill the glass
-            MotesVisible = fov > 30;
+            MotesVisible = outdoors && fov > 30;
             for (int i = 0; i < MOTES; i++)
             {
                 Vector3 s = Motes[i];

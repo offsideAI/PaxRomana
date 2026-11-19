@@ -139,6 +139,36 @@ namespace PaxRomana
             return m;
         }
 
+        // A stand-alone piece of ground for another level: a grid over the given height function, grass where it is
+        // gentle and rock where it is steep. skip(x, z) leaves out the cell centred there (for a tunnel mouth).
+        public static IndexedMesh Patch(float x0, float z0, float cell, int nx, int nz, Func<float, float, float> height, Func<float, float, bool> skip = null)
+        {
+            int vw = nx + 1, count = vw * (nz + 1);
+            IndexedMesh m = new IndexedMesh { P = new Vector3[count], N = new Vector3[count], C = new Color[count], T = new Vector2[count] };
+            for (int j = 0; j <= nz; j++)
+                for (int i = 0; i <= nx; i++)
+                {
+                    float x = x0 + i * cell, z = z0 + j * cell, y = height(x, z);
+                    float dx = (height(x + 1, z) - height(x - 1, z)) / 2, dz = (height(x, z + 1) - height(x, z - 1)) / 2;
+                    Vector3 n = Vector3.Normalize(new Vector3(-dx, 1, -dz));
+                    float nb = Noise.Fbm(x * 0.05, z * 0.05, 3, 91), gB = 0.25f + 0.3f * nb;
+                    Vector3 grass = new Vector3(0.31f, 0.39f, 0.17f) * (0.8f + gB * 0.5f), rock = new Vector3(0.52f, 0.49f, 0.44f) * (0.7f + nb * 0.6f);
+                    Vector3 c = Vector3.Lerp(grass, rock, M.Smoothstep(0.16f, 0.36f, 1 - n.Y + (gB - 0.3f) * 0.22f));
+                    int k = j * vw + i;
+                    m.P[k] = new Vector3(x, y, z); m.N[k] = n; m.C[k] = M.Col(c.X, c.Y, c.Z); m.T[k] = new Vector2(x * 0.21f, z * 0.21f);
+                }
+            List<ushort> idx = new List<ushort>(nx * nz * 6);
+            for (int j = 0; j < nz; j++)
+                for (int i = 0; i < nx; i++)
+                {
+                    if (skip != null && skip(x0 + (i + 0.5f) * cell, z0 + (j + 0.5f) * cell)) continue;
+                    int a = j * vw + i, b = a + vw, c = a + 1, d = b + 1;
+                    idx.Add((ushort)a); idx.Add((ushort)b); idx.Add((ushort)c); idx.Add((ushort)b); idx.Add((ushort)d); idx.Add((ushort)c);
+                }
+            m.Idx = idx.ToArray();
+            return m;
+        }
+
         // Builds the height grid and returns the terrain tiles: 16 inner tiles (culled separately) and the outer ring.
         public static List<IndexedMesh> Build()
         {

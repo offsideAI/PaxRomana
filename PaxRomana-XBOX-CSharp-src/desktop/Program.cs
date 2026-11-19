@@ -3,6 +3,7 @@
 //     cd desktop && dotnet run -c Release                     play in a window
 //     dotnet run -c Release -- --fullscreen                   play full screen
 //     dotnet run -c Release -- --console                      behave as on the Xbox: controller prompts, no mouse
+//     dotnet run -c Release -- --level 1                      start on Level One
 //     dotnet run -c Release -- --shots <folder>               render a fixed set of views to PNG files and exit (a visual check)
 //     dotnet run -c Release -- --voice-check                  load the intro voice-over as the game does, list it, and exit (plays nothing)
 using System;
@@ -33,19 +34,21 @@ namespace PaxRomana
 
         static void Main(string[] args)
         {
-            string shots = null; bool full = false, mute = false, console = false;
+            string shots = null; bool full = false, mute = false, console = false; int level = 0;
             for (int i = 0; i < args.Length; i++)
             {
                 if (args[i] == "--shots" && i + 1 < args.Length) shots = args[++i];
                 else if (args[i] == "--fullscreen") full = true;
                 else if (args[i] == "--mute") mute = true;
                 else if (args[i] == "--console") console = true;
+                else if (args[i] == "--level" && i + 1 < args.Length) int.TryParse(args[++i], out level);
                 else if (args[i] == "--voice-check") { Environment.Exit(VoiceCheck()); }
             }
             using (DesktopGame game = new DesktopGame(shots, full))
             {
                 game.Mute = mute || shots != null;
                 game.IsConsole = console;
+                game.StartLevel = level;
                 game.Run();
             }
         }
@@ -79,6 +82,7 @@ namespace PaxRomana
             if (shots == null || Sim == null) return;
             updateMs += clock.Elapsed.TotalMilliseconds; frames++;
             if (wait > 0) { wait -= (float)gameTime.ElapsedGameTime.TotalSeconds; if (wait > 0) return; capture = true; return; }
+            if (StartLevel == 1 && step < 26) step = 26;          // with the level option, only the Level One views
             GameSim s = Sim;
             Vector3 nest = new Vector3(Config.SPAWN_X, Terrain.GroundAt(Config.SPAWN_X, Config.SPAWN_Z) + 1.7f, Config.SPAWN_Z);
             switch (step)
@@ -101,7 +105,7 @@ namespace PaxRomana
                 case 15: s.TriggerExplosive(); wait = 0.48f; break;                                      // a charge landing on the gate
                 case 16: s.Weapon.WantAds = false; Teleport(0, 58, 0, 0.12f); wait = 0.67f; break;       // below the breached gate
                 case 17: Teleport(-14, 22, -1.2f, 0.25f); wait = 0.67f; break;                           // courtyard: keep, chapel, flagpole
-                case 18: foreach (Door d in World.Castle.Doors) d.Want = 1; Teleport(0, -11.2f, 0, -0.28f); wait = 1.0f; break;   // in the vault, at the strongbox
+                case 18: foreach (Door d in World.Site.Doors) d.Want = 1; Teleport(0, -11.2f, 0, -0.28f); wait = 1.0f; break;   // in the vault, at the strongbox
                 case 19: Teleport(-8, 4, 0.75f, 0.0f); wait = 0.6f; break;
                 case 20: s.TriggerExplosive(); wait = 0.15f; break;                                       // an explosion close by
                 case 21: wait = 0.75f; break;                                                            // its smoke
@@ -109,6 +113,23 @@ namespace PaxRomana
                 case 23: Teleport(430, -385, 0, 0.02f); Aim(new Vector3(Config.WORKS_X, 45, Config.WORKS_Z)); wait = 0.5f; break;   // the works from the edge of the valley
                 case 24: Teleport(60, 170, 0.1f, 0.0f); s.Hud.ToggleKeys(); wait = 0.5f; break;          // by the bridge, with the controls overlay
                 case 25: s.Hud.ToggleKeys(); s.Hud.End(true, new EndStats { Kills = 21, Total = 29, Shots = 30, Hits = 24, Heads = 9, Longest = 412, Time = 754, Alarms = 1, Charges = 5 }); wait = 0.33f; break;
+                // ---- Level One ----
+                case 26: if (World.Level != 1) NewMission(1); wait = 0.5f; break;                                               // its title menu
+                case 27: Sim.CanSwitchLevels = true; Sim.Begin(true); wait = Mid(0); break;               // intro: the Level One title card
+                case 28: wait = Mid(1) - Mid(0); break;                                                   // ... the beam room
+                case 29: Sim.EndIntro(); Sim.Hud.HintT = 0; wait = 0.6f; break;                           // the service lock
+                case 30: Teleport(-7.5f, -3.5f, 0, 0); Aim(new Vector3(4, Facility.FY + 0.6f, -14)); wait = 0.5f; break;      // interlock 1: crate and plate
+                case 31: Teleport(-6.5f, -25.5f, 0, 0); Aim(new Vector3(3, Facility.FY + 1.2f, -37)); wait = 0.5f; break;     // interlock 2: the beam
+                case 32: Teleport(0, -51, 0, 0); Aim(new Vector3(2, Facility.FY + 3.4f, -78)); wait = 0.5f; break;            // interlock 3: the targets
+                case 33: ((Sabotage)Sim.Mission).BulletHit(World.Facility.Targets[0].Pos); ((Sabotage)Sim.Mission).BulletHit(World.Facility.Targets[2].Pos); wait = 0.3f; break;   // two of them lit
+                case 34: Teleport(-6.5f, -81.5f, 0, 0); Aim(new Vector3(6, Facility.FY - 1, -103)); wait = 0.5f; break;       // interlock 4: the gap and the gates
+                case 35: Teleport(0, -113.5f, 0, 0); Aim(new Vector3(0, Facility.FY + 4.5f, -165)); wait = 0.5f; break;       // the centrifuge hall
+                case 36: Teleport(-3.2f, -136.5f, 0, 0); Aim(new Vector3(6, Facility.FY + 2.5f, -150)); wait = 0.5f; break;    // among the centrifuges, by the controls
+                case 37: Teleport(34, -142, 0, 0); Aim(new Vector3(60, Facility.TunnelFloor(60) + 2.2f, -142)); wait = 0.5f; break;   // the service tunnel and its blast door
+                case 38: ((Sabotage)Sim.Mission).Planted = true; Teleport(128, -138, 0, 0); Aim(new Vector3(96, Facility.FY + 17, -142)); wait = 0.6f; break;   // outside, looking back at the portal
+                case 39: Sim.Mission.Use(); wait = 0.22f; break;                                           // detonation
+                case 40: wait = 1.6f; break;                                                              // smoke from the mouth
+                case 41: wait = 5.5f; break;                                                              // the end screen
                 default:
                     Console.WriteLine("average per frame: update " + (updateMs / frames).ToString("0.00") + " ms, draw " + (drawMs / frames).ToString("0.00") + " ms over " + frames + " frames");
                     Exit(); return;
@@ -116,7 +137,7 @@ namespace PaxRomana
             step++;
         }
 
-        static float Mid(int card) { return (IntroScript.Cards[card].Start + IntroScript.Cards[card].End) / 2; }      // the middle of an intro card
+        float Mid(int card) { return (Sim.World.Intro.Cards[card].Start + Sim.World.Intro.Cards[card].End) / 2; }      // the middle of an intro card
 
         void Aim(Vector3 target)
         {
@@ -133,7 +154,7 @@ namespace PaxRomana
         }
         void Teleport(float x, float z, float yaw, float pitch)
         {
-            Sim.Player.Pos = new Vector3(x, Terrain.GroundAt(x, z), z); Sim.Player.Yaw = yaw; Sim.Player.Pitch = pitch;
+            Sim.Player.Pos = new Vector3(x, Sim.World.Arena.Ground(x, z), z); Sim.Player.Yaw = yaw; Sim.Player.Pitch = pitch;
         }
 
         protected override void Draw(GameTime gameTime)

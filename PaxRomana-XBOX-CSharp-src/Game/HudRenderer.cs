@@ -209,7 +209,7 @@ namespace PaxRomana
                 float w = Text(bold, hud.Kills.ToString(), x, cy, 34 * U, A(Bone, f));
                 w += Text(ui, "/", x + w + 4 * U, cy + 9 * U, 22 * U, A(Bone, f * 0.5f)) + 8 * U;
                 w += Text(bold, hud.Total.ToString(), x + w, cy, 34 * U, A(Bone, f));
-                Text(ui, "DEFENDERS DOWN", x + w + 12 * U, cy + 16 * U, 13 * U, A(Bone, f * 0.7f), 0, 0.2f);
+                Text(ui, hud.Level == 1 ? "GUARDS DOWN" : "DEFENDERS DOWN", x + w + 12 * U, cy + 16 * U, 13 * U, A(Bone, f * 0.7f), 0, 0.2f);
                 cy += 46 * U;
                 bool pulse = hud.Alarm && (DateTime.UtcNow.Millisecond / 350) % 2 == 0;
                 Text(ui, hud.Alarm ? "ALARM" : "GARRISON ALERT", x, cy, 11 * U, hud.Alarm ? A(new Color(255, 90, 72), f * (pulse ? 0.4f : 1)) : A(Bone, f * 0.7f), 0, 0.26f);
@@ -369,20 +369,34 @@ namespace PaxRomana
         {
             Veil();
             float w = 800 * U, h = 600 * U, x = (W - w) / 2, y = Panel(w, h), cx = W / 2, cy = y + 40 * U;
-            Text(ui, "LEVEL ZERO · BAVARIA · SUMMER 1944", cx, cy, 13 * U, Gold, 1, 0.34f); cy += 28 * U;
+            bool one = hud.Level == 1;
+            // the level, with arrows either side when the other one can be chosen from here
+            string level = one ? "LEVEL ONE · BLITZSCHEISS MOUNTAIN" : "LEVEL ZERO · BAVARIA · SUMMER 1944";
+            if (hud.LevelSelect) level = "<   " + level + "   >";
+            Text(ui, level, cx, cy, 13 * U, Gold, 1, 0.34f); cy += 28 * U;
             float t1 = Width(display, "PAX ", 84 * U, 0.1f), t2 = Width(display, "ROMANA", 84 * U, 0.1f), tx = cx - (t1 + t2 - 0.1f * 84 * U) / 2;
             Text(display, "PAX", tx, cy, 84 * U, Bone, 0, 0.1f); Text(display, "ROMANA", tx + t1, cy, 84 * U, Gold, 0, 0.1f); cy += 98 * U;
             Color sub = A(Bone, 0.82f);
-            Text(ui, "The Reich is enriching uranium-235. The keys to the works lie in the vault of Burg Adlerstein.", cx, cy, 18 * U, sub, 1, 0.02f); cy += 26 * U;
-            Text(ui, "You are an agent of the Research and Analysis Wing. One rifle, from the ridge across the river.", cx, cy, 18 * U, sub, 1, 0.02f); cy += 44 * U;
+            Text(ui, one ? "Under BlitzScheiss Mountain the Reich's centrifuges are spinning. The keys have opened the service lock."
+                : "The Reich is enriching uranium-235. The keys to the works lie in the vault of Burg Adlerstein.", cx, cy, 18 * U, sub, 1, 0.02f); cy += 26 * U;
+            Text(ui, one ? "Four interlocks guard the hall. Get through them, and leave nothing turning."
+                : "You are an agent of the Research and Analysis Wing. One rifle, from the ridge across the river.", cx, cy, 18 * U, sub, 1, 0.02f); cy += 44 * U;
             Rect(x + 52 * U, cy, w - 104 * U, Math.Max(1, U), A(Gold, 0.2f)); cy += 22 * U;
             float colL = x + 52 * U, colW = (w - 104 * U - 34 * U) * 0.535f, colR = colL + colW + 34 * U, colRW = w - 104 * U - 34 * U - colW;
             Text(display, "MISSION", colL, cy, 13 * U, Gold, 0, 0.3f); Text(display, "CONTROLS", colR, cy, 13 * U, Gold, 0, 0.3f);
             float ly = cy + 26 * U; Color body = A(Bone, 0.85f);
-            ly += Rich("<b>Take the keys.</b> Clear every defender inside the castle walls, then crack the strongbox in the vault of the keep.", colL, ly, 16 * U, colW, 23 * U, body, Bone) + 8 * U;
-            ly += Rich("Your rifle fires sniper rounds and <b>explosive charges</b>. A charge kills everything near it and blows doors and the gate off their hinges.", colL, ly, 16 * U, colW, 23 * U, body, Bone);
+            if (one)
+            {
+                ly += Rich("<b>Destroy the cascade.</b> Solve the four interlocks, clear the centrifuge hall and plant the device at the controls.", colL, ly, 16 * U, colW, 23 * U, body, Bone) + 8 * U;
+                ly += Rich("Then get out through the service tunnel and <b>detonate from outside the mountain</b>.", colL, ly, 16 * U, colW, 23 * U, body, Bone);
+            }
+            else
+            {
+                ly += Rich("<b>Take the keys.</b> Clear every defender inside the castle walls, then crack the strongbox in the vault of the keep.", colL, ly, 16 * U, colW, 23 * U, body, Bone) + 8 * U;
+                ly += Rich("Your rifle fires sniper rounds and <b>explosive charges</b>. A charge kills everything near it and blows doors and the gate off their hinges.", colL, ly, 16 * U, colW, 23 * U, body, Bone);
+            }
             string[] list = hud.IsPad
-                ? new[] { "<k>LT</k> scope <k>RT</k> fire <k>RB</k> explosive", "<k>LB</k> run · hold breath <k>X</k> reload", "<k>A</k> doors <k>B</k> crouch", "D-pad zoom and zero", "<k>View</k> all controls <k>Menu</k> pause" }
+                ? new[] { "<k>LT</k> scope <k>RT</k> fire <k>RB</k> explosive", "<k>LB</k> run · hold breath <k>X</k> reload", one ? "<k>A</k> use: crates, mirrors, doors" : "<k>A</k> doors <k>B</k> crouch", "D-pad zoom and zero", "<k>View</k> all controls <k>Menu</k> pause" }
                 : new[] { "Mouse aim <k>WASD</k> move", "LMB fire <k>G</k> explosive RMB scope", "Wheel zoom <k>Q</k> <k>E</k> zero", "<k>Shift</k> breath <k>R</k> reload <k>O</k> doors", "<k>H</k> all controls · Xbox controller works too" };
             float ry = cy + 26 * U;
             foreach (string s in list) ry += Rich(s, colR, ry, 15 * U, colRW, 29 * U, A(Bone, 0.9f), Bone);
@@ -392,19 +406,22 @@ namespace PaxRomana
             Rect(cx - 0.3f * w, cy, 0.6f * w, 2 * U, new Color((byte)255, (byte)255, (byte)255, (byte)26));
             Rect(cx - 0.3f * w, cy, 0.6f * w * M.Clamp(hud.LoadP), 2 * U, Gold); cy += 12 * U;
             string lt = !hud.Ready ? hud.LoadText : hud.IsPad ? (paused ? "Press A to resume" : "Press A to deploy") : (paused ? "Press Enter or click to resume" : "Press Enter or click to deploy");
+            if (hud.Ready && hud.LevelSelect) lt += hud.IsPad ? "  ·  D-pad left / right changes level" : "  ·  Left / right arrow changes level";
             Text(ui, lt.ToUpperInvariant(), cx, cy, 13 * U, A(Bone, 0.6f), 1, 0.2f);
         }
 
         // The Level Zero intro: a title card, then three briefing cards, in the lower part of the picture over the flight.
         void IntroCards(Hud hud)
         {
+            IntroScript script = hud.Intro;
+            if (script == null) return;
             float t = hud.IntroT, cx = W / 2;
             // open on black, and dip to black at the cuts between shots
             float dark = 1 - M.Smoothstep(0.0f, 1.2f, t);
-            for (int i = 1; i < IntroScript.Cards.Length; i++) dark = Math.Max(dark, 1 - M.Clamp(Math.Abs(t - IntroScript.Cuts[i]) / 0.45f));
-            dark = Math.Max(dark, M.Smoothstep(IntroScript.Length - 0.5f, IntroScript.Length, t));
+            for (int i = 1; i < script.Cards.Length; i++) dark = Math.Max(dark, 1 - M.Clamp(Math.Abs(t - script.Cuts[i]) / 0.45f));
+            dark = Math.Max(dark, M.Smoothstep(script.Length - 0.5f, script.Length, t));
             if (dark > 0.004f) Rect(0, 0, W, H, A(Color.Black, dark));
-            IntroCard c = IntroScript.At(t);
+            IntroCard c = script.At(t);
             if (c != null)
             {
                 float a = M.Smoothstep(0, 0.7f, t - c.Start) * M.Smoothstep(0, 0.6f, c.End - t);
@@ -433,15 +450,18 @@ namespace PaxRomana
             Veil();
             EndStats s = hud.Stats; bool win = hud.Win;
             float w = 800 * U, h = 540 * U, x = (W - w) / 2, y = Panel(w, h), cx = W / 2, cy = y + 40 * U;
-            Text(ui, win ? "LEVEL ZERO COMPLETE" : "LEVEL ZERO FAILED", cx, cy, 13 * U, Gold, 1, 0.34f); cy += 30 * U;
-            Text(display, win ? "THE KEYS ARE YOURS" : "MISSION FAILED", cx, cy, 48 * U, Bone, 1, 0.06f); cy += 66 * U;
-            Text(ui, win ? "The gates of the U-235 enrichment zone will open for you. Level One: go in, and break it from the inside." : "The garrison still holds the castle, and the keys with it.", cx, cy, 18 * U, A(Bone, 0.82f), 1, 0.02f); cy += 44 * U;
+            bool one = hud.Level == 1;
+            Text(ui, (one ? "LEVEL ONE " : "LEVEL ZERO ") + (win ? "COMPLETE" : "FAILED"), cx, cy, 13 * U, Gold, 1, 0.34f); cy += 30 * U;
+            Text(display, !win ? "MISSION FAILED" : one ? "THE CASCADE IS GONE" : "THE KEYS ARE YOURS", cx, cy, 48 * U, Bone, 1, 0.06f); cy += 66 * U;
+            Text(ui, !win ? (one ? "The centrifuges are still turning under the mountain." : "The garrison still holds the castle, and the keys with it.")
+                : one ? "Every centrifuge under BlitzScheiss Mountain is scrap. The Reich will enrich nothing here."
+                : "The gates of the U-235 enrichment zone will open for you. Level One: go in, and break it from the inside.", cx, cy, 18 * U, A(Bone, 0.82f), 1, 0.02f); cy += 44 * U;
             Rect(x + 52 * U, cy, w - 104 * U, Math.Max(1, U), A(Gold, 0.2f)); cy += 24 * U;
             int acc = s.Shots > 0 ? (int)Math.Round(100f * s.Hits / s.Shots) : 0;
             int mm = (int)(s.Time / 60), ss = (int)(s.Time % 60);
             string[][] st =
             {
-                new[] { s.Kills + "/" + s.Total, "DEFENDERS" }, new[] { acc + "%", "ACCURACY" }, new[] { s.Heads.ToString(), "HEADSHOTS" },
+                new[] { s.Kills + "/" + s.Total, one ? "GUARDS" : "DEFENDERS" }, new[] { acc + "%", "ACCURACY" }, new[] { s.Heads.ToString(), "HEADSHOTS" },
                 new[] { (int)Math.Round(s.Longest) + " m", "LONGEST SHOT" }, new[] { mm + ":" + ss.ToString("00"), "TIME" }, new[] { s.Alarms.ToString(), "ALARMS RAISED" },
                 new[] { s.Charges.ToString(), "CHARGES USED" },
             };
@@ -455,7 +475,7 @@ namespace PaxRomana
             Rect(x + 52 * U, cy, w - 104 * U, Math.Max(1, U), A(Gold, 0.2f)); cy += 22 * U;
             string rating = !win ? "—" : acc >= 85 && s.Alarms == 0 ? "CHHAYA · THE SHADOW" : acc >= 65 ? "NISHANEBAAZ · MARKSMAN" : "RANGROOT · RECRUIT";
             Text(display, rating, cx, cy, 15 * U, Gold, 1, 0.24f); cy += 40 * U;
-            Button("DEPLOY AGAIN", cx, cy, true); cy += 62 * U;
+            Button(win && !one ? "ON TO LEVEL ONE" : "DEPLOY AGAIN", cx, cy, true); cy += 62 * U;
             Text(ui, hud.IsPad ? "PRESS A" : "PRESS ENTER", cx, cy, 13 * U, A(Bone, 0.7f), 1, 0.26f);
         }
     }
