@@ -3,6 +3,7 @@
 //
 //     cd tests && dotnet run -c Release
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using Microsoft.Xna.Framework;
 
@@ -47,6 +48,47 @@ namespace PaxRomana
             float d = M.Hypot(x - sim.Player.Pos.X, z - sim.Player.Pos.Z);
             Check(d < 0.6f, label + " -> (" + sim.Player.Pos.X.ToString("0.0") + ", " + sim.Player.Pos.Z.ToString("0.0") + ")");
         }
+
+        // Looks for flicker in a level's masonry: two box faces that lie in the same plane, face the same way and
+        // overlap, where that patch is not buried inside a third box. The graphics card cannot decide which of the
+        // two is in front, and the answer changes from frame to frame.
+        static List<string> Flicker(Builder b, Func<float, float, float> ground)
+        {
+            List<string> found = new List<string>();
+            List<Builder.BoxRec> boxes = b.Boxes;
+            for (int i = 0; i < boxes.Count; i++)
+                for (int j = i + 1; j < boxes.Count; j++)
+                {
+                    Vector3 an = boxes[i].Min, ax = boxes[i].Max, bn = boxes[j].Min, bx = boxes[j].Max;
+                    if (an.X > bx.X + 0.01f || bn.X > ax.X + 0.01f || an.Y > bx.Y + 0.01f || bn.Y > ax.Y + 0.01f || an.Z > bx.Z + 0.01f || bn.Z > ax.Z + 0.01f) continue;
+                    for (int axis = 0; axis < 3; axis++)
+                        for (int side = 0; side < 2; side++)
+                        {
+                            float pa = Get(side == 0 ? an : ax, axis), pb = Get(side == 0 ? bn : bx, axis);
+                            if (Math.Abs(pa - pb) > 0.004f) continue;
+                            int u = (axis + 1) % 3, v = (axis + 2) % 3;
+                            float u0 = Math.Max(Get(an, u), Get(bn, u)), u1 = Math.Min(Get(ax, u), Get(bx, u)), v0 = Math.Max(Get(an, v), Get(bn, v)), v1 = Math.Min(Get(ax, v), Get(bx, v));
+                            if (u1 - u0 < 0.03f || v1 - v0 < 0.03f) continue;
+                            // a point just outside the shared patch: if a third box contains it, nobody can see the patch
+                            float[] c = new float[3]; c[axis] = pa + (side == 0 ? -0.02f : 0.02f); c[u] = (u0 + u1) / 2; c[v] = (v0 + v1) / 2;
+                            Vector3 probe = new Vector3(c[0], c[1], c[2]); bool buried = false;
+                            for (int k = 0; k < boxes.Count && !buried; k++)
+                                if (k != i && k != j && probe.X > boxes[k].Min.X && probe.X < boxes[k].Max.X && probe.Y > boxes[k].Min.Y && probe.Y < boxes[k].Max.Y && probe.Z > boxes[k].Min.Z && probe.Z < boxes[k].Max.Z) buried = true;
+                            // inside a round tower (taking the narrower of its two radii), or under the ground
+                            foreach (Builder.BoxRec cy in b.Cylinders)
+                            {
+                                float r = (cy.Max.X - cy.Min.X) / 2 - 0.05f, cx = (cy.Min.X + cy.Max.X) / 2, cz = (cy.Min.Z + cy.Max.Z) / 2;
+                                if (probe.Y > cy.Min.Y && probe.Y < cy.Max.Y && M.Hypot(probe.X - cx, probe.Z - cz) < r) buried = true;
+                            }
+                            if (probe.Y < ground(probe.X, probe.Z) - 0.05f) buried = true;
+                            if (buried) continue;
+                            if (boxes[i].Key == boxes[j].Key && (boxes[i].Key == "dark" || boxes[i].Key == "lamp" || boxes[i].Key == "ceiling" || boxes[i].Key == "hazard" || boxes[i].Key == "steel" || boxes[i].Key == "iron" || boxes[i].Key == "gold")) continue;      // one flat colour: nothing to see
+                            found.Add(boxes[i].Key + " / " + boxes[j].Key + " share a " + "xyz"[axis] + (side == 0 ? "-" : "+") + " face at (" + c[0].ToString("0.0") + ", " + c[1].ToString("0.0") + ", " + c[2].ToString("0.0") + "), " + (u1 - u0).ToString("0.00") + " x " + (v1 - v0).ToString("0.00") + " m");
+                        }
+                }
+            return found;
+        }
+        static float Get(Vector3 p, int axis) { return axis == 0 ? p.X : axis == 1 ? p.Y : p.Z; }
 
         static string Prompt { get { return "[" + sim.Hud.PromptKey + "] " + sim.Hud.PromptText; } }
 
@@ -335,7 +377,18 @@ namespace PaxRomana
             Console.WriteLine("6. Level One: the facility under BlitzScheiss Mountain");
             LevelOne(world, audio);
 
-            Console.WriteLine("7. Sound synthesis");
+            Console.WriteLine("7. Flicker: faces sharing a plane");
+            {
+                World one = World.BuildLevelOne(world);
+                List<string> f1 = Flicker(one.Facility.B, Facility.FloorAt), f0 = Flicker(world.Castle.B, Terrain.GroundAt), fw = Flicker(world.Works.B, Terrain.HeightAt);
+                foreach (string line in f1) Console.WriteLine("        level one: " + line);
+                foreach (string line in f0) Console.WriteLine("        castle: " + line);
+                foreach (string line in fw) Console.WriteLine("        works: " + line);
+                Check(f1.Count == 0, "Level One: no two visible box faces share a plane (" + one.Facility.B.Boxes.Count + " boxes checked)");
+                Check(f0.Count == 0 && fw.Count == 0, "Level Zero: none in the castle or the works (" + (world.Castle.B.Boxes.Count + world.Works.B.Boxes.Count) + " boxes checked)");
+            }
+
+            Console.WriteLine("8. Sound synthesis");
             sw.Restart();
             System.Collections.Generic.Dictionary<string, short[]> pcm = Synth.RenderAll();
             Console.WriteLine("        " + pcm.Count + " clips synthesised in " + sw.ElapsedMilliseconds + " ms");
@@ -351,7 +404,7 @@ namespace PaxRomana
             Check(clippedClips.Length == 0, "no clip is driven into clipping" + (clippedClips.Length > 0 ? " (" + clippedClips + ")" : ""));
             Check(seconds < 60, "about " + seconds.ToString("0") + " s of audio in memory");
 
-            Console.WriteLine("8. Intro voice-over");
+            Console.WriteLine("9. Intro voice-over");
             string dir = AppContext.BaseDirectory, voiceDir = null;
             for (int up = 0; up < 8 && dir != null && voiceDir == null; up++)
             {

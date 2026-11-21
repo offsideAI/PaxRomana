@@ -37,7 +37,7 @@ rules correctly but may use the old names.
 
 Unchanged: the map layout and coordinates, the 29 posts and patrol routes, alert rules, ballistics, kill-cam,
 explosive charges, door mechanics, controls, haptics, sound, architecture, build and deployment. The rules test now
-has 127 checks, including the intro (skipped, and played through), the walk through the keep into the vault, and the
+has 129 checks, including the intro (skipped, and played through), the walk through the keep into the vault, and the
 voice-over clips.
 
 ### Level One: BlitzScheiss Mountain (added 2026-11-18)
@@ -469,7 +469,7 @@ workflow that runs the test before it builds the package.
 
 | Check | Result |
 | --- | --- |
-| Headless rules test (`tests/`), 127 checks | Passes. Last run 2026-11-18 after Level One was added; it plays both levels through. |
+| Headless rules test (`tests/`), 129 checks | Passes. Last run 2026-11-18 after the flicker fixes; it plays both levels through and searches both for surfaces that share a plane. |
 | Shared code compiles against .NET Standard 2.0 and C# 7.3 (`tools/apicheck`) | Passes |
 | Shared code compiles against the real `MonoGame.Framework.WindowsUniversal` 3.8.1.303 assembly | Passed, in a scratch project on the Mac |
 | GitHub Actions workflow: rules test on Windows, UWP project and `Program.cs` compile with .NET Native, package signed and uploaded | Passed on the first run, 2026-11-18 (run 44402866842, commit 3575a97). That was the build before the Level Zero re-theme; the re-themed code has not been through the workflow yet. |
@@ -833,6 +833,7 @@ APIs that compile on .NET 8 but not for the console, which would otherwise surfa
 | Removing a kill-cam round early | Ending the kill-cam must only clear `Bullet.Cam`. Removing the bullet cancels the kill. The test covers this. |
 | Unseeded chance in tests | The kill-cam is random; tests set `AlwaysKillCam` to make it deterministic. |
 | Exceptions | `PaxGame.Update` and `Draw` catch everything and route it to `Fail`, which shows the error screen. Do not add code that swallows exceptions silently in the game loop. |
+| Two faces in one plane | Where two boxes have faces in the same plane that overlap, the graphics card cannot order them and the patch flickers from frame to frame. This happened at the gap in Interlock 4 (wall under a floor slab running up to floor level), on the crate, at the tunnel mouth and on the keep roof. Build so that one surface stops short of, or stands proud of, the other. The rules test searches every upright box in both levels for this (section 7 of its output); rotated boxes, cylinders and props are not covered and need care by hand. Nothing in the game should blink faster than about once a second: status lights pulse slowly or fade. |
 | Sixteen-bit index buffers | A single mesh is limited to 65,535 vertices. Large geometry is split (terrain tiles, vegetation chunks). |
 
 ### 10.15 Troubleshooting

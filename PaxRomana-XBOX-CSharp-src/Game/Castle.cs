@@ -11,6 +11,11 @@ namespace PaxRomana
     public sealed class Builder
     {
         public readonly Dictionary<string, Geo> Parts = new Dictionary<string, Geo>();
+        // Every upright, unrotated box that was added, kept so that a test can look for two faces lying in the same
+        // plane (which the graphics card cannot order, so they flicker).
+        public struct BoxRec { public string Key; public Vector3 Min, Max; }
+        public readonly List<BoxRec> Boxes = new List<BoxRec>();
+        public readonly List<BoxRec> Cylinders = new List<BoxRec>();       // as their bounding boxes
         public readonly Mulberry Rng = new Mulberry(7);
 
         public Geo Add(string key, Geo g)
@@ -35,6 +40,7 @@ namespace PaxRomana
             if (rz != 0) g.RotateZ(rz);
             if (ry != 0) g.RotateY(ry);
             g.Translate(x, y, z);
+            if (rz == 0 && ry == 0) Boxes.Add(new BoxRec { Key = key, Min = new Vector3(x - w / 2, y - h / 2, z - d / 2), Max = new Vector3(x + w / 2, y + h / 2, z + d / 2) });
             return Add(key, g);
         }
 
@@ -44,6 +50,8 @@ namespace PaxRomana
             float su = Math.Max(1, (float)Math.Round(tl * Math.Max(rt, rb) / tile)), sv = h / tile, vo = (y - h / 2) / tile;
             for (int i = 0; i < g.Count; i++) g.T[i] = new Vector2(g.T[i].X * su, g.T[i].Y * sv + vo);
             g.Translate(x, y, z);
+            float rmax = Math.Max(rt, rb);
+            if (!open && tl >= M.TAU - 0.01f) Cylinders.Add(new BoxRec { Key = key, Min = new Vector3(x - rmax, y - h / 2, z - rmax), Max = new Vector3(x + rmax, y + h / 2, z + rmax) });
             return Add(key, g);
         }
 
@@ -228,7 +236,7 @@ namespace PaxRomana
             B.Box("stone", GW * 2, 17 - GH, 7, 0, (gTop + P + GH) / 2, 36.5f);
             B.Box("stone", 12, 1.0f, 0.55f, 0, gTop + 0.5f, 39.75f);
             for (int i = 0; i < 4; i++) B.Box("stone", 1.45f, 0.95f, 0.55f, -4.1f + i * 2.75f, gTop + 1.47f, 39.75f);
-            B.Box("stone", 12, 0.5f, 0.6f, 0, gTop - 0.3f, 40.2f);
+            B.Box("stone", 11.9f, 0.5f, 0.6f, 0, gTop - 0.3f, 40.2f);
             B.Add("dark", Geo.Cylinder(2.3f, 2.3f, 0.5f, 20).RotateX(M.HALF_PI).Translate(0, P + 5.2f, 39.85f));
             // portcullis, raised into the arch
             for (int i = -3; i <= 3; i++) B.Box("iron", 0.1f, 2.5f, 0.1f, i * 0.66f, P + GH + 1.2f, 40.15f);
@@ -239,7 +247,7 @@ namespace PaxRomana
             // ---- the keep, with the vault on its ground floor ----
             const float KX = 0, KZ = -10, KW = 17, ROOM = 5; float kTop = P + 32, KH = KW / 2;
             KeepX = KX; KeepZ = KZ; KeepTop = kTop; KeepHalf = KH;
-            B.Box("plaster", KW, 32 - ROOM, KW, KX, (kTop + P + ROOM) / 2, KZ);
+            B.Box("plaster", KW, 32 - ROOM - 0.6f, KW, KX, (kTop - 0.6f + P + ROOM) / 2, KZ);          // stops under the roof slab, so their tops do not share a plane
             Shell(KX - KH, KX + KH, KZ - KH, KZ + KH, P - 4, P + ROOM, 1.5f, null, new[] { new Gap(KX, 1.8f, 2.8f) }, null, null);
             Run(true, KX - KH + 1.5f, KX + KH - 1.5f, KZ - 0.3f, KZ + 0.3f, P, P + ROOM, new[] { new Gap(KX, 1.6f, 2.6f) }, "plaster");   // vault wall
             B.Box("stone", KW + 1.2f, 0.6f, KW + 1.2f, KX, kTop - 0.3f, KZ);
@@ -323,7 +331,7 @@ namespace PaxRomana
             // courtyard well
             B.Cyl("stone", 1.25f, 1.35f, 0.9f, -16, P + 0.45f, 16, 20); B.Add("dark", Geo.Cylinder(0.95f, 0.95f, 0.06f, 20).Translate(-16, P + 0.9f, 16));
             foreach (int sx in new[] { -1, 1 }) B.Box("timber", 0.16f, 2.2f, 0.16f, -16 + sx * 1.2f, P + 1.6f, 16, 0, 1.5f);
-            B.Box("timber", 2.8f, 0.16f, 0.16f, -16, P + 2.7f, 16, 0, 1.5f);
+            B.Box("timber", 2.8f, 0.16f, 0.2f, -16, P + 2.7f, 16, 0, 1.5f);          // a little deeper than the posts, so their faces do not coincide
             Solids.Add(Solid.Circle(-16, 16, 1.4f));
 
             // ---- bridge over the river ----
@@ -400,7 +408,7 @@ namespace PaxRomana
                 }
                 B.Box("timber", 3.9f, 0.25f, 3.9f, tx, tg + 7, tz, 0, 1.5f);
                 foreach (int[] d in new[] { new[] { 1, 0 }, new[] { -1, 0 }, new[] { 0, 1 }, new[] { 0, -1 } })
-                    B.Box("timber", d[0] != 0 ? 0.12f : 3.7f, 0.12f, d[1] != 0 ? 0.12f : 3.7f, tx + d[0] * 1.8f, tg + 8.05f, tz + d[1] * 1.8f, 0, 1.5f);
+                    B.Box("timber", d[0] != 0 ? 0.12f : 3.7f, d[0] != 0 ? 0.12f : 0.09f, d[1] != 0 ? 0.12f : 3.7f, tx + d[0] * 1.8f, tg + 8.05f, tz + d[1] * 1.8f, 0, 1.5f);      // two rail heights, so the corners do not share a face
                 B.Add("timber", Geo.Cone(3.2f, 1.6f, 4).RotateY(M.PI / 4).Translate(tx, tg + 11.3f, tz));
                 // flagpole
                 B.Cyl("timber", 0.05f, 0.06f, 5.2f, CXc, cy + 2.6f, CZc + 3, 6, 1.5f);
@@ -481,10 +489,10 @@ namespace PaxRomana
             foreach (int sgn in new[] { -1, 1 })
             {
                 B.Box("concrete", PW * 2, 7, 1.6f, X, G + 2.5f, Z + sgn * PD, 0, 8);
-                B.Box("concrete", 1.6f, 7, PD * 2, X + sgn * PW, G + 2.5f, Z, 0, 8);
+                B.Box("concrete", 1.6f, 9, PD * 2, X + sgn * PW, G + 1.5f, Z, 0, 8);
                 foreach (int s2 in new[] { -1, 1 })
                 {
-                    B.Box("concrete", 7, 19, 7, X + sgn * PW, G + 8.5f, Z + s2 * PD, 0, 8);
+                    B.Box("concrete", 7, 25, 7, X + sgn * PW, G + 5.5f, Z + s2 * PD, 0, 8);
                     B.Add("slate", Geo.Cone(6.2f, 4, 4).RotateY(M.PI / 4).Translate(X + sgn * PW, G + 20, Z + s2 * PD));
                 }
             }

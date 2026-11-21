@@ -122,11 +122,11 @@ namespace PaxRomana
                 case 31: Teleport(-6.5f, -25.5f, 0, 0); Aim(new Vector3(3, Facility.FY + 1.2f, -37)); wait = 0.5f; break;     // interlock 2: the beam
                 case 32: Teleport(0, -51, 0, 0); Aim(new Vector3(2, Facility.FY + 3.4f, -78)); wait = 0.5f; break;            // interlock 3: the targets
                 case 33: ((Sabotage)Sim.Mission).BulletHit(World.Facility.Targets[0].Pos); ((Sabotage)Sim.Mission).BulletHit(World.Facility.Targets[2].Pos); wait = 0.3f; break;   // two of them lit
-                case 34: Teleport(-6.5f, -81.5f, 0, 0); Aim(new Vector3(6, Facility.FY - 1, -103)); wait = 0.5f; break;       // interlock 4: the gap and the gates
+                case 34: Teleport(-6.5f, -81.5f, 0, 0); Sim.Mission.Update(0); Sim.Mission.Use(); Aim(new Vector3(6, Facility.FY - 1, -103)); wait = 0.5f; break;       // interlock 4: the gap and the gates, crate in hand
                 case 35: Teleport(0, -113.5f, 0, 0); Aim(new Vector3(0, Facility.FY + 4.5f, -165)); wait = 0.5f; break;       // the centrifuge hall
                 case 36: Teleport(-3.2f, -136.5f, 0, 0); Aim(new Vector3(6, Facility.FY + 2.5f, -150)); wait = 0.5f; break;    // among the centrifuges, by the controls
                 case 37: Teleport(34, -142, 0, 0); Aim(new Vector3(60, Facility.TunnelFloor(60) + 2.2f, -142)); wait = 0.5f; break;   // the service tunnel and its blast door
-                case 38: ((Sabotage)Sim.Mission).Planted = true; Teleport(128, -138, 0, 0); Aim(new Vector3(96, Facility.FY + 17, -142)); wait = 0.6f; break;   // outside, looking back at the portal
+                case 38: ((Sabotage)Sim.Mission).Planted = true; Teleport(108, -137, 0, 0); Aim(new Vector3(97, Facility.FY + 12.5f, -142)); wait = 0.6f; break;   // outside, looking back at the portal and its threshold
                 case 39: Sim.Mission.Use(); wait = 0.22f; break;                                           // detonation
                 case 40: wait = 1.6f; break;                                                              // smoke from the mouth
                 case 41: wait = 5.5f; break;                                                              // the end screen

@@ -181,7 +181,9 @@ namespace PaxRomana
             B.Box("floor", 20, 0.6f, 11, 0, FY - 0.3f, -84.5f, 0, 3);            // near side, z -90 .. -79
             B.Box("floor", 20, 0.6f, 11, 0, FY - 0.3f, -105.5f, 0, 3);           // far side, z -111 .. -100
             B.Box("dark", 20, 0.4f, 10, 0, FY - 9.2f, -95);                      // the bottom of the gap
-            B.Box("panel", 18, 9, 0.3f, 0, FY - 4.5f, -89.85f); B.Box("panel", 18, 9, 0.3f, 0, FY - 4.5f, -100.15f);
+            // the walls of the gap stop under the floor slabs: if they ran up to floor level they would lie in the same
+            // plane as the slab edges, and two faces in one plane flicker
+            B.Box("panel", 18, 8.4f, 0.3f, 0, FY - 4.8f, -89.85f); B.Box("panel", 18, 8.4f, 0.3f, 0, FY - 4.8f, -100.15f);
             foreach (int s in new[] { -1, 1 }) B.Box("panel", T, 9, 10, s * 9.5f, FY - 4.5f, -95);
             B.Box("hazard", 18, 0.02f, 0.5f, 0, FY + 0.011f, -89.7f); B.Box("hazard", 18, 0.02f, 0.5f, 0, FY + 0.011f, -100.3f);
             Gates[0] = new Gate { X = -9, Z = -85, Nx = 1 };
@@ -201,7 +203,7 @@ namespace PaxRomana
             foreach (Crate c in Crates)
             {
                 Geo g = Geo.Box(0.8f, 0.8f, 0.8f).Paint(0x8f959c);
-                foreach (int s in new[] { -1, 1 }) { g.Add(Geo.Box(0.84f, 0.08f, 0.84f).Translate(0, s * 0.36f, 0).Paint(0x3a3f46)); }
+                foreach (int s in new[] { -1, 1 }) { g.Add(Geo.Box(0.84f, 0.08f, 0.84f).Translate(0, s * 0.375f, 0).Paint(0x3a3f46)); }      // bands, 1.5 cm proud of the top and bottom so no two faces coincide
                 g.Add(Geo.Box(0.3f, 0.3f, 0.82f).Paint(0xd8a61c)); g.Add(Geo.Box(0.82f, 0.3f, 0.3f).Paint(0xd8a61c));
                 c.Prop = Add(new Prop { Shape = g, Spec = 0.3f });
                 c.Solid = Solid.Circle(c.Home.X, c.Home.Z, 0.55f);
@@ -250,16 +252,16 @@ namespace PaxRomana
                 float z = TunnelZ, len = M.Hypot(60, 12), a = M.Atan2(12, 60);
                 HallExit = AddDoor("the tunnel door", true, 3.2f, 22.2f, 22.8f, z - 1.5f, z + 1.5f, new[] { new[] { 22.5f, z - 1.5f, 1.5f, -M.HALF_PI, 0 }, new[] { 22.5f, z + 1.5f, 1.5f, M.HALF_PI, 0 } }, FY);
                 HallExit.Auto = true;
-                B.Box("floor", 8, 0.6f, 7, 27, FY - 0.3f, z, 0, 3);                                              // level start
-                B.Box("floor", len, 0.6f, 7, 60, FY + 6 - 0.3f, z, 0, 3, a);                                      // the ramp
-                B.Box("floor", 12, 0.6f, 7, 96, FY + 12 - 0.3f, z, 0, 3);                                          // level top, out to the ledge
-                B.Box("ceiling", 8, 0.6f, 7, 27, FY + 4.8f, z, 0, 3);
-                B.Box("ceiling", len, 0.6f, 7, 60, FY + 6 + 4.8f, z, 0, 3, a);
-                B.Box("ceiling", 8, 0.6f, 7, 94, FY + 12 + 4.8f, z, 0, 3);
+                B.Box("floor", 8, 0.6f, 5, 27, FY - 0.3f, z, 0, 3);                                              // level start
+                B.Box("floor", len, 0.6f, 5, 60, FY + 6 - 0.3f, z, 0, 3, a);                                      // the ramp
+                B.Box("floor", 10, 0.6f, 5, 95, FY + 12 - 0.3f, z, 0, 3);                                          // level top, ending where the ledge begins
+                B.Box("ceiling", 8, 0.6f, 5, 27, FY + 4.8f, z, 0, 3);
+                B.Box("ceiling", len, 0.6f, 5, 60, FY + 6 + 4.8f, z, 0, 3, a);
+                B.Box("ceiling", 8, 0.6f, 5, 94, FY + 12 + 4.8f, z, 0, 3);
                 foreach (int s in new[] { -1, 1 })
                 {
-                    B.Box("concrete", 75, 20, T, 60.5f, FY + 8, z + s * 3, 0, 4);
-                    Solids.Add(Solid.Box(23, 98, z + s * 3 - 0.5f, z + s * 3 + 0.5f));
+                    B.Box("concrete", 77.2f, 20, T, 61.6f, FY + 8, z + s * 3, 0, 4);
+                    Solids.Add(Solid.Box(23, 100.2f, z + s * 3 - 0.5f, z + s * 3 + 0.5f));
                 }
                 for (int i = 0; i < 6; i++) { float x = 30 + i * 11; B.Box("lamp", 0.5f, 0.08f, 1.2f, x, TunnelFloor(x) + 4.4f, z); Lamps.Add(new Vector3(x, TunnelFloor(x) + 4.2f, z)); }
                 // the blast door half way up, and its lock above it
@@ -270,14 +272,13 @@ namespace PaxRomana
                 Release = new Target { Pos = new Vector3(BlastDoorX - 0.2f, by + 4.5f, z) };
                 B.Box("steel", 0.4f, 0.7f, 5, BlastDoorX, by + 4.5f, z);
                 Release.Prop = Add(new Prop { Shape = Disc(0.32f, 0.06f), World = Matrix.CreateRotationZ(M.HALF_PI) * Matrix.CreateTranslation(Release.Pos), Lit = false });
-                // the portal in the mountainside: a concrete face let into the slope, with an apron in front of it
+                // the portal in the mountainside: a concrete face let into the slope, with wing walls either side of the mouth
                 foreach (int s in new[] { -1, 1 })
                 {
                     B.Box("concrete", 16.2f, 22, 4.5f, 92.1f, FY + 21, z + s * 5.75f, 0, 4);          // wing walls, out past the mouth
                     Solids.Add(Solid.Box(84, MouthX + 4.2f, s > 0 ? z + 3 : z - 8, s > 0 ? z + 8 : z - 3));
                 }
                 B.Box("concrete", 12, 14.9f, 7, 90, FY + 24.55f, z, 0, 4);
-                B.Box("concrete", 4.4f, 1, 16, 98.1f, FY + 11.5f, z, 0, 4);
                 B.Box("hazard", 0.3f, 0.02f, 7, 97, FY + 12.011f, z);
                 // the mountainside either side of the portal cannot be climbed
                 Solids.Add(Solid.Box(MouthX - 6, MouthX, -700, z - 8)); Solids.Add(Solid.Box(MouthX - 6, MouthX, z + 8, 400));
@@ -504,7 +505,7 @@ namespace PaxRomana
             {
                 if (!Solved[2]) tg.LitT = Math.Max(0, tg.LitT - dt);
                 if (tg.LitT > 0) lit++;
-                tg.Prop.Colour = Solved[2] ? new Vector3(0.2f, 0.95f, 0.4f) : tg.LitT > 0 ? new Vector3(1.0f, 0.62f, 0.12f) * (tg.LitT < 2 && (int)(t * 6) % 2 == 0 ? 0.5f : 1) : new Vector3(0.22f, 0.24f, 0.27f);
+                tg.Prop.Colour = Solved[2] ? new Vector3(0.2f, 0.95f, 0.4f) : tg.LitT > 0 ? Vector3.Lerp(new Vector3(0.22f, 0.24f, 0.27f), new Vector3(1.0f, 0.62f, 0.12f), 0.35f + 0.65f * M.Clamp(tg.LitT / 3)) : new Vector3(0.22f, 0.24f, 0.27f);      // dims steadily over its last three seconds: no blinking
             }
             if (lit == 3) Solve(2, "three lit at once");
             f.Interlock[2].Want = Solved[2] ? 1 : 0;

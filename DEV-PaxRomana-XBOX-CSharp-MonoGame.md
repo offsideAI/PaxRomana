@@ -128,7 +128,7 @@ Example: `dotnet run -c Release -- --console --mute`
 This plays a mission with no window, sound or controller: it starts with **A**, skips the intro (and later lets it
 play through), walks and turns, fires a round and checks the vibration, skips one kill-cam and watches another,
 breaches the gate, opens the keep and the vault, takes the keys, wins, restarts, opens a door and synthesises the
-sound. It prints one line per check (127 in all, including that the four voice-over clips are present and fit their cards) and exits non-zero if any fails. It
+sound. It prints one line per check (129 in all, including that the four voice-over clips are present and fit their cards) and exits non-zero if any fails. It
 takes a few seconds.
 
     cd PaxRomana-XBOX-CSharp-src
